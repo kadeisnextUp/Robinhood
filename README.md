@@ -1,65 +1,108 @@
-# Welcome to your Expo app 👋
+# [REDACTED] - Charity Voting App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile application that democratizes charitable giving through community voting and ad-supported donations.
 
-## Get started
+## Overview
 
-To start the app, in your terminal run:
+[REDACTED] allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue (users watch ads to contribute) and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
 
-```bash
-npm run start
-```
+## Features
 
-In the output, you'll find options to open the app in:
+- **Weekly Charity Voting**: Vote for 1 of 5 featured charities each week
+- **Ad-Supported Donations**: Watch ads to contribute without spending money
+- **Direct Donations**: Option to donate from your own pocket
+- **Community Curation**: 2 of 5 weekly charities come from user suggestions with upvoting
+- **Transparent Donations**: Public history of all donations with proof/receipts
+- **Fair Rotation**: Charities can only win twice per year with cooldown periods
 
-- [a development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [an Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [an iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Tech Stack
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Frontend
+- **React Native** with Expo
+- **Expo Router** for file-based navigation
+- Cross-platform (iOS & Android)
 
-## Workflows
+### Backend
+- **Supabase** (PostgreSQL database, Authentication, Storage)
 
-This project is configured to use [EAS Workflows](https://docs.expo.dev/eas/workflows/get-started/) to automate some development and release processes. These commands are set up in [`package.json`](./package.json) and can be run using NPM scripts in your terminal.
+### Payment & Monetization (Planned not final)
+- **Stripe** for direct donations
+- **Google AdMob** for ad revenue
 
-### Previews
-
-Run `npm run draft` to [publish a preview update](https://docs.expo.dev/eas/workflows/examples/publish-preview-update/) of your project, which can be viewed in Expo Go or in a development build.
-
-### Development Builds
-
-Run `npm run development-builds` to [create a development build](https://docs.expo.dev/eas/workflows/examples/create-development-builds/). Note - you'll need to follow the [Prerequisites](https://docs.expo.dev/eas/workflows/examples/create-development-builds/#prerequisites) to ensure you have the correct emulator setup on your machine.
-
-### Production Deployments
-
-Run `npm run deploy` to [deploy to production](https://docs.expo.dev/eas/workflows/examples/deploy-to-production/). Note - you'll need to follow the [Prerequisites](https://docs.expo.dev/eas/workflows/examples/deploy-to-production/#prerequisites) to ensure you're set up to submit to the Apple and Google stores.
-
-## Hosting
-
-Expo offers hosting for websites and API functions via EAS Hosting. See the [Getting Started](https://docs.expo.dev/eas/hosting/get-started/) guide to learn more.
+### Target Platforms
+- iOS (App Store)
+- Android (Google Play Store)
 
 
-## Get a fresh project
 
-When you're ready, run:
 
-```bash
-npm run reset-project
-```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Development Roadmap
 
-## Learn more
+### Month 1: React Native Fundamentals 
+- [x] Project setup
+- [] Basic UI components
+- [] Home screen with charity list
 
-To learn more about developing your project with Expo, look at the following resources:
+### Month 2: Supabase Integration
+- [ ] Database schema design
+- [ ] Supabase authentication
+- [ ] CRUD operations for charities and votes
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Month 3: Core Features
+- [ ] Voting mechanism (one vote per user per week)
+- [ ] Weekly rotation logic
+- [ ] AdMob integration
+- [ ] Vote tracking and results
 
-## Join the community
+### Month 4: Payments & Advanced Features
+- [ ] Stripe integration for donations
+- [ ] Charity suggestion system
+- [ ] Upvoting mechanism
+- [ ] Admin tools for weekly management
 
-Join our community of developers creating universal apps.
+### Month 5: Polish & Launch
+- [ ] UI/UX improvements
+- [ ] Testing (unit, integration, user)
+- [ ] App Store submission (iOS)
+- [ ] Google Play submission (Android)
+- [ ] Privacy policy & terms of service
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Key Features & Rules
+
+### Charity Selection
+- 5 charities featured each week
+- 2 from top user suggestions (upvoted)
+- 3 from curated list (US-based 501(c)(3) organizations)
+
+### Charity Eligibility
+- Can win maximum twice per year
+- 6-month cooldown after first win
+- Ineligible for rest of year after second win
+- Resets January 1st
+
+### Voting Rules
+- One vote per user per week
+- Email verification required
+- Voting period: 7 days (week-long rounds)
+
+### Donation Methods
+- Watch ads (primary): Users watch rewarded video ads
+- Direct donations: Optional monetary contributions
+- No maximum donation amount or frequency
+- Vote and donation are separate actions
+
+## Contributing
+
+This is a personal learning project, but suggestions and feedback are welcome!
+
+
+## Acknowledgments
+
+- Built with [Expo](https://expo.dev/)
+- Database by [Supabase](https://supabase.com/)
+
+---
+
+**Note**: This is in active development. Features and structure may change as the project evolves.
