@@ -41,12 +41,12 @@ A mobile application that democratizes charitable giving through community votin
 
 ### Month 1: React Native Fundamentals 
 - [x] Project setup
-- [] Basic UI components
-- [] Home screen with charity list
+- [x] Basic UI components
+- [x] Home screen with charity list
 
 ### Month 2: Supabase Integration
-- [ ] Database schema design
-- [ ] Supabase authentication
+- [x] Database schema design
+- [x] Supabase authentication
 - [ ] CRUD operations for charities and votes
 
 ### Month 3: Core Features
