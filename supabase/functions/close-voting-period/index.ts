@@ -7,16 +7,31 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Step 1: Find all open voting periods that have passed their end date
+    const body = await req.json();
+    const force = body?.force ?? false;
+    const forcePeriodId = body?.period_id ?? null;
     const now = new Date().toISOString();
 
-    const { data: expiredPeriods, error: periodsError } = await supabase
-      .from('voting_periods')
-      .select('id')
-      .eq('is_closed', false)
-      .lt('end_date', now);
-
-    if (periodsError) throw periodsError;
+    let expiredPeriods;
+    // force close through admin page 
+    if (force && forcePeriodId) {
+      const { data, error } = await supabase
+        .from('voting_periods')
+        .select('id')
+        .eq('id', forcePeriodId)
+        .eq('is_closed', false);
+      if (error) throw error;
+      expiredPeriods = data;
+    } else {
+      // normal close 
+      const { data, error } = await supabase
+        .from('voting_periods')
+        .select('id')
+        .eq('is_closed', false)
+        .lt('end_date', now);
+      if (error) throw error;
+      expiredPeriods = data;
+    }
 
     if (!expiredPeriods || expiredPeriods.length === 0) {
       return new Response(
@@ -28,8 +43,6 @@ Deno.serve(async (req) => {
     const results = [];
 
     for (const period of expiredPeriods) {
-
-      // Step 2: Get all charities in this period
       const { data: periodCharities, error: charitiesError } = await supabase
         .from('voting_period_charities')
         .select('charity_id')
@@ -37,7 +50,6 @@ Deno.serve(async (req) => {
 
       if (charitiesError) throw charitiesError;
 
-      // Step 3: Count votes for each charity in this period
       const voteCounts = await Promise.all(
         periodCharities.map(async (item) => {
           const { count } = await supabase
@@ -53,12 +65,10 @@ Deno.serve(async (req) => {
         })
       );
 
-      // Step 4: Find the winner — charity with the most votes
       const winner = voteCounts.reduce((best, current) =>
         current.votes > best.votes ? current : best
       );
 
-      // Step 5: Close the voting period and record the winner
       const { error: updateError } = await supabase
         .from('voting_periods')
         .update({

@@ -47,11 +47,11 @@ A mobile application that democratizes charitable giving through community votin
 ### Month 2: Supabase Integration
 - [x] Database schema design
 - [x] Supabase authentication
-- [ ] CRUD operations for charities and votes
+- [x] CRUD operations for charities and votes
 
 ### Month 3: Core Features
-- [ ] Voting mechanism (one vote per user per week)
-- [ ] Weekly rotation logic
+- [x] Voting mechanism (one vote per user per week)
+- [x] Weekly rotation logic
 - [ ] AdMob integration
 - [ ] Vote tracking and results
 
@@ -59,7 +59,7 @@ A mobile application that democratizes charitable giving through community votin
 - [ ] Stripe integration for donations
 - [ ] Charity suggestion system
 - [ ] Upvoting mechanism
-- [ ] Admin tools for weekly management
+- [x] Admin tools for weekly management
 
 ### Month 5: Polish & Launch
 - [ ] UI/UX improvements

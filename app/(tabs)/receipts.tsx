@@ -21,7 +21,7 @@ export default function DonationReceiptsScreen() {
       setLoading(true);
       setError(null);
 
-      // Step 1: Get all closed donations with charity info and period info
+      // get all closed donations with charity info and period info
       const { data: donations, error: donationsError } = await supabase
         .from('donations')
         .select(`
@@ -31,6 +31,7 @@ export default function DonationReceiptsScreen() {
           transaction_id,
           proof_url,
           voting_period_id,
+          charity_id,
           charities (
             name
           )
@@ -39,24 +40,24 @@ export default function DonationReceiptsScreen() {
 
       if (donationsError) throw donationsError;
 
-      // Step 2: For each donation, get vote counts for the winning charity
+      // for each donation, get vote counts for the winning charity
       const receiptsWithVotes = await Promise.all(
         donations.map(async (donation) => {
 
-          // Get total votes in that period
+          // total votes in that period
           const { count: totalVotes } = await supabase
             .from('votes')
             .select('id', { count: 'exact', head: true })
             .eq('voting_period_id', donation.voting_period_id);
 
-          // Get votes for the winning charity specifically
+          // votes for the winning charity specifically
           const { count: winnerVotes } = await supabase
             .from('votes')
             .select('id', { count: 'exact', head: true })
             .eq('voting_period_id', donation.voting_period_id)
-            .eq('charity_id', donation.charities.id);
+            .eq('charity_id', donation.charity_id);
 
-          // Calculate winner's vote share percentage
+          // calculate winner's vote share percentage
           const percentage = totalVotes > 0
             ? Math.round((winnerVotes / totalVotes) * 100)
             : 0;

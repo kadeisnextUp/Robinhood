@@ -1,4 +1,4 @@
-import { colors, spacing, typography } from '@/src/theme';
+import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { HeaderTitle } from '@react-navigation/elements';
 import { Link, router } from 'expo-router';
@@ -7,11 +7,24 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 import { useAuth } from '../../contexts/authContext';
 import { supabase } from '../../services/supabase';
 
+interface Profile {
+  isAdmin: boolean;
+  name: string;
+  email: string;
+  number: string;
+  avatar: string;
+  totalAdsWatched: number;
+  totalAdsRevenue: number;
+  totalDonated: number;
+  charitiesVoted: number;
+  recentDonations: Array<{ id: string; charity: string; amount: number; date: string }>;
+}
+
 export default function ProfileScreen() {
   const { session } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session) {
@@ -31,7 +44,7 @@ export default function ProfileScreen() {
       // get profile info
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, phone, avatar_url')
+        .select('name, phone, avatar_url, is_admin')
         .eq('user_id', userId)
         .single();
 
@@ -88,6 +101,7 @@ export default function ProfileScreen() {
         .limit(5);
 
       setProfile({
+        isAdmin: profileData?.is_admin ?? false,
         name: profileData?.name || 'User',
         email: session.user.email || '',
         number: profileData?.phone || 'Not provided',
@@ -174,6 +188,15 @@ export default function ProfileScreen() {
       <View style={styles.headerBar}>
         <HeaderTitle style={styles.headerTitle}>My Profile</HeaderTitle>
         <View style={styles.placeholder} />
+        {/* Only visible to admins */}
+        {profile?.isAdmin && (
+          <TouchableOpacity
+            style={styles.adminButton}
+            onPress={() => router.push('/admin')}
+          >
+            <Text style={styles.adminButtonText}>Admin Panel</Text>
+          </TouchableOpacity>
+        )}
         <Link href="/settings" asChild>
           <TouchableOpacity style={styles.settingsButton}>
             <Ionicons name="settings-outline" size={24} color={colors.text} />
@@ -452,4 +475,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold,
   },
+  adminButton: {
+  backgroundColor: colors.cardBackground,
+  padding: spacing.sm,
+  borderRadius: borderRadius.md,
+  alignItems: 'center',
+  marginHorizontal: spacing.sm,
+  marginBottom: spacing.xxl,
+  borderWidth: 1,
+  borderColor: colors.border,
+},
+adminButtonText: {
+  color: colors.secondary,
+  fontSize: typography.sizes.sm,
+},
 });
