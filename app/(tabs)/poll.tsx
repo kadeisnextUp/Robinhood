@@ -1,9 +1,10 @@
-import { resultsAPI } from '@/src/api/results';
+import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function CurrentResultsScreen() {  
+  // component states
   const [results, setResults] = useState([]);
   const [votingPeriod, setVotingPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,10 +19,10 @@ export default function CurrentResultsScreen() {
   // calculate time remaining until Saturday 11:59 PM
   useEffect(() => {
     const calculateTimeRemaining = () => {
-      if (!votingPeriod || !votingPeriod.endDate) return;
+      if (!votingPeriod || !votingPeriod.end_date) return;
       
       const now = new Date();
-      const end = new Date(votingPeriod.endDate);
+      const end = new Date(votingPeriod.end_date);
       const diff = end - now;
       
       if (diff <= 0) {
@@ -53,9 +54,53 @@ export default function CurrentResultsScreen() {
     try {
       setLoading(true);
       setError(null);
-      const data = await resultsAPI.getCurrentResults();
-      setResults(data.charities);
-      setVotingPeriod(data.votingPeriod);
+
+      // get the current open voting period
+      const { data: period, error: periodError } = await supabase
+        .from('voting_periods')
+        .select('id, start_date, end_date')
+        .eq('is_closed', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (periodError) throw periodError;
+
+      setVotingPeriod(period);
+
+      // get the 5 charities for this voting period
+      const { data: periodCharities, error: charitiesError } = await supabase
+        .from('voting_period_charities')
+        .select(`
+          charity_id,
+          charities (
+            id,
+            name
+          )
+        `)
+        .eq('voting_period_id', period.id);
+
+      if (charitiesError) throw charitiesError;
+
+      // get the vote count for each charity in this period
+      const charitiesWithVotes = await Promise.all(
+        periodCharities.map(async (item) => {
+          const { count } = await supabase
+            .from('votes')
+            .select('id', { count: 'exact', head: true })
+            .eq('voting_period_id', period.id)
+            .eq('charity_id', item.charity_id);
+
+          return {
+            id: item.charities.id,
+            name: item.charities.name,
+            votes: count ?? 0,
+          };
+        })
+      );
+
+      setResults(charitiesWithVotes);
+
     } catch (err) {
       setError('Failed to load results. Please try again.');
       console.error('Error loading results:', err);
@@ -70,7 +115,43 @@ export default function CurrentResultsScreen() {
     setRefreshing(false);
   };
 
-  // loading state
+  // format voting period dates for display
+  const formatVotingPeriod = () => {
+    if (!votingPeriod) return '';
+    const start = new Date(votingPeriod.start_date);
+    const end = new Date(votingPeriod.end_date);
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `Week of ${startStr} - ${endStr}`;
+  };
+
+  // sort results by votes highest first
+  const sortedResults = [...results].sort((a, b) => b.votes - a.votes);
+
+  // calculate total votes for percentage bars
+  const totalVotes = sortedResults.reduce((sum, charity) => sum + charity.votes, 0);
+  const getPercentage = (votes) => totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
+
+  // podium colors for top 3
+  const getPodiumColor = (index) => {
+    switch (index) {
+      case 0: return colors.gold;
+      case 1: return colors.silver;
+      case 2: return colors.bronze;
+      default: return colors.textDark;
+    }
+  };
+
+  // trophy emoji for top 3
+  const getTrophyEmoji = (index) => {
+    switch (index) {
+      case 0: return '🏆';
+      case 1: return '🥈';
+      case 2: return '🥉';
+      default: return null;
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -80,19 +161,15 @@ export default function CurrentResultsScreen() {
     );
   }
 
-  // error state
   if (error) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.errorText}>{error}</Text>
-        <Text style={styles.retryText} onPress={loadResults}>
-          Tap to retry
-        </Text>
+        <Text style={styles.retryText} onPress={loadResults}>Tap to retry</Text>
       </View>
     );
   }
 
-  // no votes yet state
   if (results.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -102,51 +179,8 @@ export default function CurrentResultsScreen() {
     );
   }
 
-  // sort results by votes (highest first)
-  const sortedResults = [...results].sort((a, b) => b.votes - a.votes);
-  
-  // calculate total votes
-  const totalVotes = sortedResults.reduce((sum, charity) => sum + charity.votes, 0);
-  
-  // percentage for each charity
-  const getPercentage = (votes) => {
-    return totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-  };
-  
-  // podium color based on ranking
-  const getPodiumColor = (index) => {
-    switch(index) {
-      case 0: return colors.gold; // Gold for 1st
-      case 1: return colors.silver; // Silver for 2nd
-      case 2: return colors.bronze; // Bronze for 3rd
-      default: return colors.textDark; // dark brown for others
-    }
-  };
-  
-  // trophy emoji based on ranking
-  const getTrophyEmoji = (index) => {
-    switch(index) {
-      case 0: return '🏆'; // Gold trophy for 1st
-      case 1: return '🥈'; // Silver medal for 2nd
-      case 2: return '🥉'; // Bronze medal for 3rd
-      default: return null;
-    }
-  };
-
-  // voting period dates
-  const formatVotingPeriod = () => {
-    if (!votingPeriod) return 'Week of Feb 3-9, 2026';
-    
-    const start = new Date(votingPeriod.startDate);
-    const end = new Date(votingPeriod.endDate);
-    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    
-    return `Week of ${startStr}-${endStr}`;
-  };
-
-  return (    
-    <ScrollView 
+  return (
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -158,22 +192,21 @@ export default function CurrentResultsScreen() {
     >
       <Text style={styles.title}>Current Week's Results</Text>
       <Text style={styles.subtitle}>{formatVotingPeriod()}</Text>
-      
+
       {timeRemaining && (
         <View style={styles.countdownBanner}>
           <Text style={styles.bannerText}>⏱️ Voting ends in: {timeRemaining}</Text>
         </View>
       )}
-      
+
       {sortedResults.map((charity, index) => {
         const percentage = getPercentage(charity.votes);
         const barColor = getPodiumColor(index);
         const trophy = getTrophyEmoji(index);
         const rank = index + 1;
-        
+
         return (
           <View key={charity.id} style={styles.resultCard}>
-            {/* Trophy Badge for Top 3, or Rank Number for others */}
             <View style={styles.rankBadge}>
               {trophy ? (
                 <Text style={styles.trophyEmoji}>{trophy}</Text>
@@ -181,24 +214,22 @@ export default function CurrentResultsScreen() {
                 <Text style={styles.rankNumber}>#{rank}</Text>
               )}
             </View>
-            
+
             <View style={styles.cardHeader}>
               <Text style={styles.charityName}>{charity.name}</Text>
               <Text style={[styles.voteCount, { color: barColor }]}>
-                {charity.votes} votes
+                {charity.votes} {charity.votes === 1 ? 'vote' : 'votes'}
               </Text>
             </View>
-            
-            {/* Progress Bar */}
+
             <View style={styles.progressBarContainer}>
-              <View 
+              <View
                 style={[
-                  styles.progressBarFill, 
+                  styles.progressBarFill,
                   { width: `${percentage}%`, backgroundColor: barColor }
-                ]} 
+                ]}
               />
             </View>
-            
           </View>
         );
       })}
@@ -207,7 +238,7 @@ export default function CurrentResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {    
+  container: {
     flex: 1,
     backgroundColor: colors.background,
     padding: spacing.lg,
@@ -268,9 +299,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
-    paddingLeft: spacing.xl, 
+    paddingLeft: spacing.xl,
   },
-  charityName: {  
+  charityName: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.semiBold,
     color: colors.text,
@@ -283,7 +314,7 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: colors.grey + '30', // 30% opacity gray background
+    backgroundColor: colors.grey + '30',
     borderRadius: borderRadius.sm,
     overflow: 'hidden',
     marginBottom: spacing.xs,
@@ -298,7 +329,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   errorText: {
-    color: colors.error || '#FF6B6B',
+    color: colors.error,
     fontSize: typography.sizes.lg,
     textAlign: 'center',
     marginBottom: spacing.md,
