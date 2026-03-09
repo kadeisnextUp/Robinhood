@@ -16,7 +16,7 @@ export default function CurrentResultsScreen() {
     loadResults();
   }, []);
 
-  // calculate time remaining until Saturday 11:59 PM
+  // calculate time remaining until Saturday 11:55 PM
   useEffect(() => {
     const calculateTimeRemaining = () => {
       if (!votingPeriod || !votingPeriod.end_date) return;

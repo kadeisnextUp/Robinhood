@@ -33,7 +33,7 @@ export default function HomeScreen() {
     setError(null);
     try {
 
-      //get the current open voting period
+      // get the current open voting period
       const { data: period, error: periodError } = await supabase
         .from('voting_periods')
         .select('id')
@@ -42,7 +42,12 @@ export default function HomeScreen() {
         .limit(1)
         .single();
 
-      if (periodError) throw periodError;
+        // if no active period, show message and don't crash
+      if (periodError || !period) {
+        setError('No active voting period. Please check back later.');
+        setLoading(false)
+        return;
+      }
 
       setCurrentPeriodId(period.id);
 
@@ -114,6 +119,14 @@ export default function HomeScreen() {
   // handles the vote action, guards auth, confirms, then writes to Supabase
   const handleVote = async (charityId: string, charityName: string) => {
     requireAuth(() => {
+      // Guard against voting when no active period exists
+      if (!currentPeriodId) {
+        Alert.alert(
+          "Voting Unavailable",
+          "A new voting period is being prepared. Please try again in a few minutes."
+        );
+        return;
+      }
       Alert.alert(
         "Are you sure?",
         `You are about to vote for ${charityName}. You can only vote once per week.`,
