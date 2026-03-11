@@ -2,7 +2,7 @@ import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
 
 export default function HomeScreen() {
@@ -61,7 +61,8 @@ export default function HomeScreen() {
             name,
             description,
             category,
-            logo_url
+            logo_url,
+            website_url
           )
         `)
         .eq('voting_period_id', period.id);
@@ -208,6 +209,14 @@ export default function HomeScreen() {
             <Text style={styles.charityCategory}>{charity.category}</Text>
             <Text style={styles.charityName}>{charity.name}</Text>
             <Text style={styles.charityDescription}>{charity.description}</Text>
+            {charity.website_url && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(charity.website_url)}
+                style={styles.websiteButton}
+              >
+                <Text style={styles.websiteButtonText}>Visit Website →</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               style={[styles.voteButton, userHasVoted && styles.voteButtonDisabled]}
               onPress={() => handleVote(charity.id, charity.name)}
@@ -311,4 +320,13 @@ const styles = StyleSheet.create({
   backgroundColor: colors.textLight,
   opacity: 0.5,
   },
+  websiteButton: {
+  alignSelf: 'center',
+  marginBottom: spacing.sm,
+  },
+  websiteButtonText: {
+  color: colors.primary,
+  fontSize: typography.sizes.sm,
+  textDecorationLine: 'underline',
+  },  
 });

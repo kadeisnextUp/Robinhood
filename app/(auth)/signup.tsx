@@ -1,6 +1,6 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
@@ -10,6 +10,10 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // read the returnTo param 
+  const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
+
 
   const handleSignup = async () => {
     if (!email || !password || !confirmPassword) {

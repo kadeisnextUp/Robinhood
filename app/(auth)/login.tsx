@@ -1,6 +1,6 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
@@ -9,6 +9,9 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Read the returnTo param if it was passed from the vote/donation screen 
+  const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -72,7 +75,10 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+        <TouchableOpacity onPress={() => router.push({ 
+          pathname: '/(auth)/signup', 
+          params: { returnTo: returnTo ?? '/(tabs)' } 
+          })}>
           <Text style={styles.linkText}>
             Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
           </Text>

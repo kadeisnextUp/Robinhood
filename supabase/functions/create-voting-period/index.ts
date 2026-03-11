@@ -58,13 +58,18 @@ Deno.serve(async (req) => {
     const shuffled = eligibleCharities.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, 5);
 
+    
+
+    //adimn forces the new voting period
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+
     // create the new voting period which will start in the dead period
     const end = new Date(start);
     end.setDate(end.getDate() + 6);  
     end.setHours(23, 55, 0, 0);   
 
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
 
     const { data: newPeriod, error: periodError } = await supabase
       .from('voting_periods')

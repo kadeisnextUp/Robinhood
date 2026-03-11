@@ -2,18 +2,49 @@ import { useAuth } from '@/contexts/authContext';
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+
+
+
+const CATEGORY_OPTIONS = [
+  'Environment',
+  'Healthcare',
+  'Food Security',
+  'Animal Welfare',
+  'Education',
+  'Human Rights',
+  'Disaster Relief',
+  'Housing & Homelessness',
+  'American Indian',
+  'Arts & Culture',
+  'Cancer',
+  'Blind & Visually Impaired',
+  'Child Sponsorship',
+  'Children & Youth',
+  'Civil Rights',
+  'Community Development & Civic Organizations',
+  'Education & Literacy',
+  'Elderly',
+  'Human Services',
+  'Law & Public Interest',
+  'Police & Firefighter Organizations',
+  'Religious',
+  'Veterans & Military',
+  'Relief & Development',
+];
+
 
 export default function AdminScreen() {
   const { session } = useAuth();
@@ -23,11 +54,31 @@ export default function AdminScreen() {
   const [closedPeriods, setClosedPeriods] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Donation form state
+  // donation form state
   const [donationAmount, setDonationAmount] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [proofUrl, setProofUrl] = useState('');
   const [selectedPeriodId, setSelectedPeriodId] = useState(null);
+
+  // charity management state
+  const [charities, setCharities] = useState([]);
+  const [showAddCharity, setShowAddCharity] = useState(false);
+  const [newCharityName, setNewCharityName] = useState('');
+  const [newCharityDescription, setNewCharityDescription] = useState('');
+  const [newCharityCategory, setNewCharityCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [newCharityLogoUrl, setNewCharityLogoUrl] = useState('');
+  const [charityActionLoading, setCharityActionLoading] = useState(false);
+  const [newCharityWebsiteUrl, setNewCharityWebsiteUrl] = useState('');
+
+  // donations history state
+  const [donationsHistory, setDonationsHistory] = useState([]);
+  const [editingDonation, setEditingDonation] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editTransactionId, setEditTransactionId] = useState('');
+  const [editProofUrl, setEditProofUrl] = useState('');
+
+
+
 
   useEffect(() => {
     if (session) {
@@ -50,7 +101,7 @@ export default function AdminScreen() {
       setIsAdmin(data.is_admin);
 
       if (data.is_admin) {
-        await loadPeriods();
+        await Promise.all([loadPeriods(), loadCharities(), loadDonationsHistory()]);
       }
     } catch (err) {
       console.error('Admin check error:', err);
@@ -112,6 +163,49 @@ export default function AdminScreen() {
     }
   };
 
+  // force open a voting period when there are none active
+  const handleCreatePeriod = async () => {
+    Alert.alert(
+      'Create Voting Period',
+      'Are you sure you want to create a new voting period now?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const response = await fetch(
+                'https://cmnmabsemvdzgwrjjwiw.supabase.co/functions/v1/create-voting-period',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+                  },
+                  body: JSON.stringify({}),
+                }
+              );
+
+              const result = await response.json();
+              console.log('Create period result:', JSON.stringify(result));
+
+              if (!result.success) throw new Error(result.error);
+
+              Alert.alert('Success', 'New voting period created!');
+              await loadPeriods();
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to create voting period');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // force close a voting period and declare winner 
   const handleClosePeriod = async () => {
     Alert.alert(
       'Close Voting Period',
@@ -160,6 +254,41 @@ export default function AdminScreen() {
         },
       ]
     );
+  };
+
+  const loadCharities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('charities')
+        .select('id, name, category, is_approved')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setCharities(data ?? []);
+    } catch (err) {
+      console.error('Load charities error:', err);
+    }
+  };
+
+  const loadDonationsHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('donations')
+        .select(`
+          id,
+          amount,
+          donated_at,
+          transaction_id,
+          proof_url,
+          charities (name)
+        `)
+        .order('donated_at', { ascending: false });
+
+      if (error) throw error;
+      setDonationsHistory(data ?? []);
+    } catch (err) {
+      console.error('Load donations history error:', err);
+    }
   };
 
   const handleRecordDonation = async () => {
@@ -218,6 +347,90 @@ export default function AdminScreen() {
     );
   };
 
+  const handleToggleApproval = async (charityId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('charities')
+        .update({ is_approved: !currentStatus })
+        .eq('id', charityId);
+
+      if (error) throw error;
+      await loadCharities();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update charity status.');
+    }
+  };
+
+  const handleAddCharity = async () => {
+    if (!newCharityName.trim()) {
+      Alert.alert('Error', 'Please enter a charity name.');
+      return;
+    }
+    if (!newCharityDescription.trim()) {
+      Alert.alert('Error', 'Please enter a description.');
+      return;
+    }
+
+    setCharityActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('charities')
+        .insert({
+          name: newCharityName.trim(),
+          description: newCharityDescription.trim(),
+          category: newCharityCategory,
+          logo_url: newCharityLogoUrl.trim() || null,
+          website_url: newCharityWebsiteUrl.trim() || null,
+          is_approved: true,
+        });
+
+      if (error) throw error;
+
+      Alert.alert('Success', `${newCharityName} added successfully!`);
+      setNewCharityName('');
+      setNewCharityDescription('');
+      setNewCharityCategory(CATEGORY_OPTIONS[0]);
+      setNewCharityLogoUrl('');
+      setNewCharityWebsiteUrl('');
+      setShowAddCharity(false);
+      await loadCharities();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to add charity.');
+    } finally {
+      setCharityActionLoading(false);
+    }
+  };
+
+  const handleEditDonation = async () => {
+    if (!editAmount || isNaN(parseFloat(editAmount))) {
+      Alert.alert('Error', 'Please enter a valid amount.');
+      return;
+    }
+    if (!editProofUrl.trim()) {
+      Alert.alert('Error', 'Please enter a proof URL.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('donations')
+        .update({
+          amount: parseFloat(editAmount),
+          transaction_id: editTransactionId || null,
+          proof_url: editProofUrl.trim(),
+        })
+        .eq('id', editingDonation.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Donation updated successfully!');
+      setEditingDonation(null);
+      await loadDonationsHistory();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to update donation.');
+    }
+  };
+
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -254,6 +467,20 @@ export default function AdminScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Admin Panel</Text>
+      {/* Show create button when there is no open period */}
+      {!currentPeriod && (
+        <TouchableOpacity
+          style={[styles.button, styles.primaryButton, actionLoading && styles.buttonDisabled, {width: '75%', paddingVertical: spacing.sm, alignSelf: 'center'}]}
+          onPress={handleCreatePeriod}
+          disabled={actionLoading}
+        >
+          {actionLoading ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.buttonText}>Create New Voting Period</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       {/* Current Voting Period */}
       <View style={styles.section}>
@@ -265,7 +492,7 @@ export default function AdminScreen() {
             </Text>
             <Text style={styles.cardSubtext}>Status: Open</Text>
             <TouchableOpacity
-              style={[styles.button, styles.dangerButton, actionLoading && styles.buttonDisabled]}
+              style={[styles.button, styles.dangerButton, actionLoading && styles.buttonDisabled,]}
               onPress={handleClosePeriod}
               disabled={actionLoading}
             >
@@ -354,6 +581,197 @@ export default function AdminScreen() {
           </View>
         )}
       </View>
+
+
+     {/* Donations History */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Donations History</Text>
+        {donationsHistory.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardSubtext}>No donations recorded yet.</Text>
+          </View>
+        ) : (
+          donationsHistory.map((donation) => (
+            <View key={donation.id} style={styles.card}>
+              {editingDonation?.id === donation.id ? (
+                // Edit mode
+                <View>
+                  <Text style={styles.cardText}>{donation.charities?.name}</Text>
+                  <Text style={styles.label}>Amount ($)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editAmount}
+                    onChangeText={setEditAmount}
+                    keyboardType="decimal-pad"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={styles.label}>Transaction ID (optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editTransactionId}
+                    onChangeText={setEditTransactionId}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={styles.label}>Proof URL</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editProofUrl}
+                    onChangeText={setEditProofUrl}
+                    autoCapitalize="none"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <View style={styles.rowButtons}>
+                    <TouchableOpacity
+                      style={[styles.button, styles.primaryButton, styles.halfButton]}
+                      onPress={handleEditDonation}
+                    >
+                      <Text style={styles.buttonText}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.button, styles.secondaryButton, styles.halfButton]}
+                      onPress={() => setEditingDonation(null)}
+                    >
+                      <Text style={styles.secondaryButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                // View mode
+                <View>
+                  <Text style={styles.cardText}>{donation.charities?.name}</Text>
+                  <Text style={styles.cardSubtext}>
+                    ${parseFloat(donation.amount).toFixed(2)} — {formatDate(donation.donated_at)}
+                  </Text>
+                  {donation.transaction_id && (
+                    <Text style={styles.cardSubtext}>TXN: {donation.transaction_id}</Text>
+                  )}
+                  <Text style={styles.proofUrl} numberOfLines={1}>{donation.proof_url}</Text>
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={() => {
+                      setEditingDonation(donation);
+                      setEditAmount(donation.amount.toString());
+                      setEditTransactionId(donation.transaction_id || '');
+                      setEditProofUrl(donation.proof_url || '');
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Charity Management */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Charity Management</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryButton, styles.smallButton]}
+            onPress={() => setShowAddCharity(!showAddCharity)}
+          >
+            <Text style={styles.buttonText}>{showAddCharity ? 'Cancel' : '+ Add'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Add Charity Form */}
+        {showAddCharity && (
+          <View style={styles.card}>
+            <Text style={styles.cardText}>New Charity</Text>
+
+            <Text style={styles.label}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={newCharityName}
+              onChangeText={setNewCharityName}
+              placeholder="Charity name"
+              placeholderTextColor={colors.textSecondary}
+            />
+
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={newCharityDescription}
+              onChangeText={setNewCharityDescription}
+              placeholder="Short description"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={4}
+            />
+
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={newCharityCategory}
+                onValueChange={(value) => setNewCharityCategory(value)}
+                style={styles.picker}
+                dropdownIconColor={colors.text}
+              >
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <Picker.Item key={cat} label={cat} value={cat} />
+                ))}
+              </Picker>
+            </View>
+
+            <Text style={styles.label}>Logo URL (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={newCharityLogoUrl}
+              onChangeText={setNewCharityLogoUrl}
+              placeholder="https://..."
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+            />
+            <Text style={styles.label}>Website URL (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={newCharityWebsiteUrl}
+              onChangeText={setNewCharityWebsiteUrl}
+              placeholder="https://..."
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+            />
+
+            <TouchableOpacity
+              style={[styles.button, styles.primaryButton, charityActionLoading && styles.buttonDisabled]}
+              onPress={handleAddCharity}
+              disabled={charityActionLoading}
+            >
+              {charityActionLoading ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Add Charity</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Charity List */}
+        {charities.map((charity) => (
+          <View key={charity.id} style={styles.card}>
+            <View style={styles.charityRow}>
+              <View style={styles.charityInfo}>
+                <Text style={styles.cardText}>{charity.name}</Text>
+                <Text style={styles.cardSubtext}>{charity.category}</Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.approvalBadge,
+                  charity.is_approved ? styles.approvedBadge : styles.unapprovedBadge,
+                ]}
+                onPress={() => handleToggleApproval(charity.id, charity.is_approved)}
+              >
+                <Text style={styles.approvalBadgeText}>
+                  {charity.is_approved ? 'Approved' : 'Unapproved'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+
     </ScrollView>
   );
 }
@@ -364,11 +782,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     paddingTop: spacing.xxl,
   },
-    backButton: {
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },    
-
   title: {
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.bold,
@@ -380,6 +793,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   sectionTitle: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold,
@@ -390,16 +809,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardBackground,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    gap: spacing.md,
+    marginBottom: spacing.md,
   },
   cardText: {
     fontSize: typography.sizes.md,
     color: colors.text,
     fontWeight: typography.weights.semiBold,
+    marginBottom: spacing.xs,
   },
   cardSubtext: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  proofUrl: {
+    fontSize: typography.sizes.xs,
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
   label: {
     fontSize: typography.sizes.sm,
@@ -415,6 +841,20 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  picker: {
+    color: colors.text,
   },
   periodOption: {
     padding: spacing.md,
@@ -449,12 +889,60 @@ const styles = StyleSheet.create({
   dangerButton: {
     backgroundColor: colors.error,
   },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryButtonText: {
+    color: colors.text,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semiBold,
+  },
+  smallButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: 0,
+  },
+  halfButton: {
+    flex: 1,
+    marginHorizontal: spacing.xs,
+  },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
     color: colors.white,
     fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semiBold,
+  },
+  rowButtons: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+  },
+  charityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  charityInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  approvalBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  approvedBadge: {
+    backgroundColor: colors.success,
+  },
+  unapprovedBadge: {
+    backgroundColor: colors.error,
+  },
+  approvalBadgeText: {
+    color: colors.white,
+    fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semiBold,
   },
   errorText: {
