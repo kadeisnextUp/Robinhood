@@ -1,37 +1,88 @@
+import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
 
 
 
+
 export default function DonateScreen() {
-    // component state for donation amount, ad watched, user donation amount, and weekly pool
+    // component state for donation amount, user donation amount, weekly pool, and donation timer
   const [donationAmount, setDonationAmount] = useState('');
-  const [userAdWatched, setUserAdWatched] = useState(0); 
   const [userDonationAmount, setUserDonationAmount] = useState(0); 
   const [weeklyPool, setWeeklyPool] = useState(127.50); // Fake data for now
+  const [votingPeriod, setVotingPeriod] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // auth check for donation actions
-   const { requireAuth } = useRequireAuth();
+  const { requireAuth } = useRequireAuth();
 
+  useEffect(() => {
+    loadResults();
+  }, []);
 
-  const handleWatchAd = () => {
-    // This will integrate with AdMob later
-    // For now, just simulate watching an ad
-    requireAuth(() => {
-      Alert.alert(
-        'Ad Watched!',
-        'Thanks for watching! $0.05 has been added to this week\'s donation pool.',
-        [{ text: 'OK', onPress: () => {
-        // Simulate adding ad revenue to pool
-          setWeeklyPool(prev => prev + 0.05);
-          setUserAdWatched(prev => prev + 1);
-        }}]
-      );
-    });
+// calculate time remaining until Saturday 11:55 PM
+  useEffect(() => {
+    const calculateTimeRemaining = () => {
+      if (!votingPeriod || !votingPeriod.end_date) return;
+      
+      const now = new Date();
+      const end = new Date(votingPeriod.end_date);
+      const diff = end - now;
+      
+      if (diff <= 0) {
+        setTimeRemaining('Voting ended');
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      if (days > 0) {
+        setTimeRemaining(`${days}d ${hours}h ${minutes}m remaining`);
+      } else if (hours > 0) {
+        setTimeRemaining(`${hours}h ${minutes}m ${seconds}s remaining`);
+      } else {
+        setTimeRemaining(`${minutes}m ${seconds}s remaining`);
+      }
+    };
+    
+    calculateTimeRemaining();
+    const interval = setInterval(calculateTimeRemaining, 1000);
+    
+    return () => clearInterval(interval);
+  }, [votingPeriod]);
+
+  const loadResults = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // get the current open voting period
+      const { data: period, error: periodError } = await supabase
+        .from('voting_periods')
+        .select('id, start_date, end_date')
+        .eq('is_closed', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (periodError) throw periodError;
+
+      setVotingPeriod(period);
+    } catch (err) {
+      console.error('Error loading voting period:', err);
+      setError('Failed to load voting period. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
-
+   
   const handleDirectDonate = () => {
     const amount = parseFloat(donationAmount);
     
@@ -62,33 +113,9 @@ export default function DonateScreen() {
         <Text style={styles.poolLabel}>This Week's Donation Pool</Text>
         <Text style={styles.poolAmount}>${weeklyPool.toFixed(2)}</Text>
         <Text style={styles.poolSubtext}>Will go to this week's winning charity</Text>
-        <Text style={styles.poolUserAmount}>
-          {userAdWatched ? `You have watched ${userAdWatched} ad(s) this week!` : null}
-        </Text>
         <Text style={styles.poolUserDonationAmount}>
           {userDonationAmount > 0 ? `You have donated $${userDonationAmount.toFixed(2)} this week!` : null}
         </Text>
-      </View>
-
-      {/* Watch Ad Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Watch an Ad to Donate</Text>
-        <Text style={styles.sectionDescription}>
-          Watch a short video ad and we'll add the revenue to this week's donation pool at no cost to you!
-        </Text>
-        <TouchableOpacity 
-          style={styles.adButton}
-          onPress={handleWatchAd}
-        >
-          <Text style={styles.adButtonText}>▶ Watch Ad (~$0.05)</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>OR</Text>
-        <View style={styles.dividerLine} />
       </View>
 
       {/* Direct Donation Section */}
@@ -127,7 +154,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     paddingHorizontal: spacing.md,
   },
-
   poolContainer: {
     padding: spacing.lg,
     borderRadius: borderRadius.lg,
@@ -182,32 +208,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     lineHeight: 20,
   },
-  adButton: {
-    backgroundColor: colors.secondary,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  adButtonText: {
-    color: colors.white,
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.bold,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-  dividerText: {
-    marginHorizontal: 15,
-    color: colors.textLight,
-    fontWeight: typography.weights.semiBold,
-  },
+
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -112,7 +112,7 @@ export default function AdminScreen() {
 
   const loadPeriods = async () => {
     try {
-      // Get current open period
+      // get current open period
       const { data: openPeriod } = await supabase
         .from('voting_periods')
         .select(`
@@ -130,7 +130,7 @@ export default function AdminScreen() {
 
       setCurrentPeriod(openPeriod);
 
-      // Get closed periods without a donation record yet
+      // get closed periods without a donation record yet
       const { data: closed } = await supabase
         .from('voting_periods')
         .select(`
@@ -147,7 +147,7 @@ export default function AdminScreen() {
         .not('winner_charity_id', 'is', null)
         .order('end_date', { ascending: false });
 
-      // Filter out periods that already have a donation recorded
+      // filter out periods that already have a donation recorded
       const { data: existingDonations } = await supabase
         .from('donations')
         .select('voting_period_id');

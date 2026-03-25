@@ -301,6 +301,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     alignSelf: 'center',
     marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   voteButton: {
     backgroundColor: colors.secondary,

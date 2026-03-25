@@ -2,12 +2,29 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 Deno.serve(async (req) => {
   try {
+
     // creates a Supabase client with the service role key
     // service role bypasses RLS so this function can write to the database
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+    // guard: don't create a new period if one is already open
+    const { data: existingPeriod } = await supabase
+      .from('voting_periods')
+      .select('id')
+      .eq('is_closed', false)
+      .single();
+
+    if (existingPeriod) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'A voting period is already open. Close it before creating a new one.' 
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     // first get the last 3 voting periods
     const { data: recentPeriods, error: periodsError } = await supabase
@@ -60,7 +77,7 @@ Deno.serve(async (req) => {
 
     
 
-    //adimn forces the new voting period
+    // admin forces the new voting period
     const now = new Date();
     const start = new Date(now);
     start.setHours(0, 0, 0, 0);
