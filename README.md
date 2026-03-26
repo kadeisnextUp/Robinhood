@@ -1,15 +1,14 @@
 # [REDACTED] - Charity Voting App
 
-A mobile application that democratizes charitable giving through community voting and ad-supported donations.
+A mobile application that democratizes charitable giving through community voting and user donations.
 
 ## Overview
 
-[REDACTED] allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue (users watch ads to contribute) and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
+[REDACTED] allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
 
 ## Features
 
 - **Weekly Charity Voting**: Vote for 1 of 5 featured charities each week
-- **Ad-Supported Donations**: Watch ads to contribute without spending money
 - **Direct Donations**: Option to donate from your own pocket
 - **Community Curation**: 2 of 5 weekly charities come from user suggestions with upvoting
 - **Transparent Donations**: Public history of all donations with proof/receipts
@@ -20,13 +19,13 @@ A mobile application that democratizes charitable giving through community votin
 ### Frontend
 - **React Native** with Expo
 - **Expo Router** for file-based navigation
-- Cross-platform (iOS & Android)
+- Cross-platform (iOS & Android) and website
 
 ### Backend
 - **Supabase** (PostgreSQL database, Authentication, Storage)
 
 ### Payment & Monetization (Planned not final)
-- **Stripe** for direct donations
+- **Paypal** for direct donations
 - **Google AdMob** for ad revenue
 
 ### Target Platforms
@@ -53,10 +52,10 @@ A mobile application that democratizes charitable giving through community votin
 - [x] Voting mechanism (one vote per user per week)
 - [x] Weekly rotation logic
 - [ ] AdMob integration
-- [ ] Vote tracking and results
+- [x] Vote tracking and results
 
 ### Month 4: Payments & Advanced Features
-- [ ] Stripe integration for donations
+- [ ] Paypal integration for donations
 - [ ] Charity suggestion system
 - [ ] Upvoting mechanism
 - [x] Admin tools for weekly management
@@ -84,18 +83,18 @@ A mobile application that democratizes charitable giving through community votin
 
 ### Voting Rules
 - One vote per user per week
-- Email verification required
-- Voting period: 7 days (week-long rounds)
+- Must create an account in order to vote
+- Voting period: 7 days (week-long rounds) Monday - Sunday @ 11:55 PM
 
 ### Donation Methods
-- Watch ads (primary): Users watch rewarded video ads
 - Direct donations: Optional monetary contributions
+- Must create an account in order to donate
 - No maximum donation amount or frequency
 - Vote and donation are separate actions
 
 ## Contributing
 
-This is a personal learning project, but suggestions and feedback are welcome!
+This is a personal learning project with a plan to launch as an actual product, but suggestions and feedback are welcome!
 
 
 ## Acknowledgments
