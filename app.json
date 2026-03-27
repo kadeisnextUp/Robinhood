@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "RobinHood",
-    "slug": "RobinHood",
+    "name": "CharityFund",
+    "slug": "CharityFund",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "robinhood",
+    "scheme": "charityfund",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sawyerkd.appRobinHood"
+      "bundleIdentifier": "com.sawyerkd.appCharityFund"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +40,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
