@@ -75,12 +75,20 @@ export default function DonateScreen() {
       // get real weekly pool total from donations table
       const { data: poolData, error: poolError } = await supabase
         .from('user_donations')
-        .select('amount')
+        .select('amount, user_id')
         .eq('voting_period_id', period.id);
 
       if (!poolError && poolData) {
         const total = poolData.reduce((sum, row) => sum + row.amount, 0);
         setWeeklyPool(total);
+
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const userTotal = poolData
+            .filter(row => row.user_id === currentUser.id)
+            .reduce((sum, row) => sum + row.amount, 0);
+          setUserDonationAmount(userTotal);
+        }
       }
     } catch (err) {
       console.error('Error loading voting period:', err);
@@ -101,6 +109,9 @@ export default function DonateScreen() {
     requireAuth(async () => {
       try {
         setDonating(true);
+
+        // ensure we have a fresh access token before calling the edge function
+        await supabase.auth.refreshSession();
 
         // call Edge Function to create a PayPal order
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-order', {
@@ -141,7 +152,7 @@ export default function DonateScreen() {
         // if user completed payment, capture it
         if (result.type === 'success') {
           const { data: captureData, error: captureError } = await supabase.functions.invoke('capture-paypal-order', {
-            body: { orderId: sessionData.orderId },
+            body: { orderId: sessionData.orderId, userId: user?.id, votingPeriodId: sessionData.votingPeriodId },
           });
 
           console.log('Capture PayPal Order Response:', { captureData, captureError });
@@ -168,10 +179,8 @@ export default function DonateScreen() {
             throw new Error('Payment was not completed');
           }
 
-          // update local state to reflect new donation
-          setWeeklyPool(prev => prev + amount);
-          setUserDonationAmount(prev => prev + amount);
           setDonationAmount('');
+          await loadResults();
 
           Alert.alert(
             'Thank You! 🎉',

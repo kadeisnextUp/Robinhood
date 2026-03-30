@@ -6,7 +6,7 @@ See `AGENTS.md` for additional Expo/EAS-specific documentation links and AI agen
 
 ## What This App Does
 
-A mobile charity voting platform where users vote weekly on 5 rotating charities. Donation pools (direct PayPal donations) and ad revenue go entirely to the weekly winning charity. Charities have fairness rules: max 2 wins/year, 6-month cooldown after first win.
+A mobile charity voting platform in active development where users vote weekly on 5 rotating charities. Donation pools (direct PayPal donations) and ad revenue go entirely to the weekly winning charity. Charities have fairness rules: max 2 wins/year, 6-month cooldown after first win. The project is built publicly with a repository on GitHub. For the MVP all that is left is to finalize the donation process by a user and putting ads in the app. Currently working on connecting paypal to the app.
 
 ## Commands
 
@@ -51,6 +51,7 @@ No unit test framework is configured. Manual testing uses development builds (`e
 **Key database tables:** `voting_periods`, `voting_period_charities`, `charities`, `votes`, `user_donations`
 
 **Theme/styling:** `src/theme/` (colors, typography, spacing). UI components in `src/components/`.
+
 
 ## Environment Variables
 

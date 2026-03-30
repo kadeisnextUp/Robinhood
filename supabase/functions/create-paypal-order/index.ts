@@ -17,6 +17,9 @@ async function getPayPalAccessToken(): Promise<string> {
   });
 
   const data = await response.json();
+  if (!response.ok || !data.access_token) {
+    throw new Error(`PayPal auth failed: ${data.error_description || data.error || response.status}`);
+  }
   return data.access_token;
 }
 
@@ -38,15 +41,22 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: votingPeriodId } = await supabase
-      .rpc('get_active_voting_period');
+    const { data: votingPeriod, error: periodError } = await supabase
+      .from('voting_periods')
+      .select('id')
+      .eq('is_closed', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!votingPeriodId) {
+    if (periodError || !votingPeriod) {
       return new Response(JSON.stringify({ error: 'No active voting period' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const votingPeriodId = votingPeriod.id;
 
     // get PayPal access token
     const accessToken = await getPayPalAccessToken();
@@ -89,7 +99,7 @@ Deno.serve(async (req) => {
     // extract the approval URL that we send the user to
     const approvalUrl = order.links.find((l: any) => l.rel === 'approve')?.href;
 
-    return new Response(JSON.stringify({ orderId: order.id, approvalUrl }), {
+    return new Response(JSON.stringify({ orderId: order.id, approvalUrl, votingPeriodId }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

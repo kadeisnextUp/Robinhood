@@ -21,5 +21,5 @@ export function useRequireAuth() {
     return true;
   };
 
-  return { requireAuth, isAuthenticated: !!session };
+  return { requireAuth, isAuthenticated: !!session, user: session?.user ?? null };
 }

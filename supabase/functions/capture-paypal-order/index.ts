@@ -21,10 +21,10 @@ async function getPayPalAccessToken(): Promise<string> {
 
 Deno.serve(async (req) => {
   try {
-    const { orderId } = await req.json();
+    const { orderId, userId, votingPeriodId } = await req.json();
 
-    if (!orderId) {
-      return new Response(JSON.stringify({ error: 'Order ID is required' }), {
+    if (!orderId || !userId || !votingPeriodId) {
+      return new Response(JSON.stringify({ error: 'orderId, userId, and votingPeriodId are required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -52,7 +52,6 @@ Deno.serve(async (req) => {
     const capture = purchaseUnit.payments.captures[0];
     const amount = parseFloat(capture.amount.value);
     const transactionId = capture.id;
-    const { user_id, voting_period_id } = JSON.parse(purchaseUnit.custom_id);
 
     // log to Supabase
     const supabase = createClient(
@@ -63,8 +62,8 @@ Deno.serve(async (req) => {
     const { error: insertError } = await supabase
       .from('user_donations')
       .insert({
-        user_id,
-        voting_period_id,
+        user_id: userId,
+        voting_period_id: votingPeriodId,
         amount,
         transaction_id: transactionId,
         donated_at: new Date().toISOString(),
