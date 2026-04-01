@@ -16,8 +16,6 @@ import {
   View,
 } from 'react-native';
 
-
-
 const CATEGORY_OPTIONS = [
   'Environment',
   'Healthcare',
@@ -29,22 +27,19 @@ const CATEGORY_OPTIONS = [
   'Housing & Homelessness',
   'American Indian',
   'Arts & Culture',
-  'Cancer',
-  'Blind & Visually Impaired',
-  'Child Sponsorship',
+  'Health & Medical',
+  'Disabilities',
   'Children & Youth',
   'Civil Rights',
-  'Community Development & Civic Organizations',
-  'Education & Literacy',
+  'Community Development',
   'Elderly',
   'Human Services',
-  'Law & Public Interest',
-  'Police & Firefighter Organizations',
+  'Legal & Public Interest',
+  'Public Safety',
   'Religious',
   'Veterans & Military',
   'Relief & Development',
 ];
-
 
 export default function AdminScreen() {
   const { session } = useAuth();
@@ -62,13 +57,13 @@ export default function AdminScreen() {
 
   // charity management state
   const [charities, setCharities] = useState([]);
-  const [showAddCharity, setShowAddCharity] = useState(false);
-  const [newCharityName, setNewCharityName] = useState('');
-  const [newCharityDescription, setNewCharityDescription] = useState('');
-  const [newCharityCategory, setNewCharityCategory] = useState(CATEGORY_OPTIONS[0]);
-  const [newCharityLogoUrl, setNewCharityLogoUrl] = useState('');
-  const [charityActionLoading, setCharityActionLoading] = useState(false);
-  const [newCharityWebsiteUrl, setNewCharityWebsiteUrl] = useState('');
+
+  // import from Every.org state
+  const [showImport, setShowImport] = useState(false);
+  const [importCategory, setImportCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [importCount, setImportCount] = useState('10');
+
+  const [importLoading, setImportLoading] = useState(false);
 
   // donations history state
   const [donationsHistory, setDonationsHistory] = useState([]);
@@ -76,9 +71,6 @@ export default function AdminScreen() {
   const [editAmount, setEditAmount] = useState('');
   const [editTransactionId, setEditTransactionId] = useState('');
   const [editProofUrl, setEditProofUrl] = useState('');
-
-
-
 
   useEffect(() => {
     if (session) {
@@ -112,7 +104,6 @@ export default function AdminScreen() {
 
   const loadPeriods = async () => {
     try {
-      // get current open period
       const { data: openPeriod } = await supabase
         .from('voting_periods')
         .select(`
@@ -130,7 +121,6 @@ export default function AdminScreen() {
 
       setCurrentPeriod(openPeriod);
 
-      // get closed periods without a donation record yet
       const { data: closed } = await supabase
         .from('voting_periods')
         .select(`
@@ -147,7 +137,6 @@ export default function AdminScreen() {
         .not('winner_charity_id', 'is', null)
         .order('end_date', { ascending: false });
 
-      // filter out periods that already have a donation recorded
       const { data: existingDonations } = await supabase
         .from('donations')
         .select('voting_period_id');
@@ -163,7 +152,6 @@ export default function AdminScreen() {
     }
   };
 
-  // force open a voting period when there are none active
   const handleCreatePeriod = async () => {
     Alert.alert(
       'Create Voting Period',
@@ -188,8 +176,6 @@ export default function AdminScreen() {
               );
 
               const result = await response.json();
-              console.log('Create period result:', JSON.stringify(result));
-
               if (!result.success) throw new Error(result.error);
 
               Alert.alert('Success', 'New voting period created!');
@@ -205,7 +191,6 @@ export default function AdminScreen() {
     );
   };
 
-  // force close a voting period and declare winner 
   const handleClosePeriod = async () => {
     Alert.alert(
       'Close Voting Period',
@@ -231,22 +216,12 @@ export default function AdminScreen() {
               );
 
               const result = await response.json();
-              console.log('Response status:', response.status);
-              console.log('Response result:', JSON.stringify(result));
-
               if (!result.success) throw new Error(result.error);
 
-              Alert.alert(
-                'Success',
-                `Voting period closed. Winner declared!`
-              );
+              Alert.alert('Success', `Voting period closed. Winner declared!`);
               await loadPeriods();
             } catch (err) {
-              console.log('Close period error:', JSON.stringify(err));
-              console.log('Close period error message:', err.message);
-              console.log('Close period response status:', err.status);
               Alert.alert('Error', JSON.stringify(err) || 'Something went wrong');
-
             } finally {
               setActionLoading(false);
             }
@@ -361,44 +336,48 @@ export default function AdminScreen() {
     }
   };
 
-  const handleAddCharity = async () => {
-    if (!newCharityName.trim()) {
-      Alert.alert('Error', 'Please enter a charity name.');
-      return;
-    }
-    if (!newCharityDescription.trim()) {
-      Alert.alert('Error', 'Please enter a description.');
+  const handleImportCharities = async () => {
+    const count = parseInt(importCount, 10);
+    if (isNaN(count) || count < 1 || count > 50) {
+      Alert.alert('Error', 'Please enter a count between 1 and 50.');
       return;
     }
 
-    setCharityActionLoading(true);
-    try {
-      const { error } = await supabase
-        .from('charities')
-        .insert({
-          name: newCharityName.trim(),
-          description: newCharityDescription.trim(),
-          category: newCharityCategory,
-          logo_url: newCharityLogoUrl.trim() || null,
-          website_url: newCharityWebsiteUrl.trim() || null,
-          is_approved: true,
-        });
+    Alert.alert(
+      'Import Charities',
+      `Import up to ${count} "${importCategory}" charities from Every.org?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Import',
+          onPress: async () => {
+            setImportLoading(true);
+            try {
+              const { data, error } = await supabase.functions.invoke('import-charities', {
+                body: {
+                  category: importCategory,
+                  count,
+                },
+              });
 
-      if (error) throw error;
+              if (error) throw error;
 
-      Alert.alert('Success', `${newCharityName} added successfully!`);
-      setNewCharityName('');
-      setNewCharityDescription('');
-      setNewCharityCategory(CATEGORY_OPTIONS[0]);
-      setNewCharityLogoUrl('');
-      setNewCharityWebsiteUrl('');
-      setShowAddCharity(false);
-      await loadCharities();
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to add charity.');
-    } finally {
-      setCharityActionLoading(false);
-    }
+              Alert.alert(
+                'Import Complete',
+                `${data.inserted} ${data.inserted === 1 ? 'charity' : 'charities'} imported and pending approval.`
+              );
+              setImportCount('10');
+              setShowImport(false);
+              await loadCharities();
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Import failed.');
+            } finally {
+              setImportLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleEditDonation = async () => {
@@ -447,7 +426,6 @@ export default function AdminScreen() {
     );
   }
 
-  // Block non-admins entirely
   if (!session || !isAdmin) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -459,18 +437,18 @@ export default function AdminScreen() {
 
   return (
     <ScrollView style={styles.container}>
-        <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
-        onPress={() => router.push('/(tabs)/profile') }
+        onPress={() => router.push('/(tabs)/profile')}
       >
         <Ionicons name="arrow-back" size={32} color={colors.secondary} />
       </TouchableOpacity>
 
       <Text style={styles.title}>Admin Panel</Text>
-      {/* Show create button when there is no open period */}
+
       {!currentPeriod && (
         <TouchableOpacity
-          style={[styles.button, styles.primaryButton, actionLoading && styles.buttonDisabled, {width: '75%', paddingVertical: spacing.sm, alignSelf: 'center'}]}
+          style={[styles.button, styles.primaryButton, actionLoading && styles.buttonDisabled, { width: '75%', paddingVertical: spacing.sm, alignSelf: 'center' }]}
           onPress={handleCreatePeriod}
           disabled={actionLoading}
         >
@@ -492,7 +470,7 @@ export default function AdminScreen() {
             </Text>
             <Text style={styles.cardSubtext}>Status: Open</Text>
             <TouchableOpacity
-              style={[styles.button, styles.dangerButton, actionLoading && styles.buttonDisabled,]}
+              style={[styles.button, styles.dangerButton, actionLoading && styles.buttonDisabled]}
               onPress={handleClosePeriod}
               disabled={actionLoading}
             >
@@ -582,8 +560,7 @@ export default function AdminScreen() {
         )}
       </View>
 
-
-     {/* Donations History */}
+      {/* Donations History */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Donations History</Text>
         {donationsHistory.length === 0 ? (
@@ -594,7 +571,6 @@ export default function AdminScreen() {
           donationsHistory.map((donation) => (
             <View key={donation.id} style={styles.card}>
               {editingDonation?.id === donation.id ? (
-                // Edit mode
                 <View>
                   <Text style={styles.cardText}>{donation.charities?.name}</Text>
                   <Text style={styles.label}>Amount ($)</Text>
@@ -636,7 +612,6 @@ export default function AdminScreen() {
                   </View>
                 </View>
               ) : (
-                // View mode
                 <View>
                   <Text style={styles.cardText}>{donation.charities?.name}</Text>
                   <Text style={styles.cardSubtext}>
@@ -670,42 +645,25 @@ export default function AdminScreen() {
           <Text style={styles.sectionTitle}>Charity Management</Text>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton, styles.smallButton]}
-            onPress={() => setShowAddCharity(!showAddCharity)}
+            onPress={() => setShowImport(!showImport)}
           >
-            <Text style={styles.buttonText}>{showAddCharity ? 'Cancel' : '+ Add'}</Text>
+            <Text style={styles.buttonText}>{showImport ? 'Cancel' : '↓ Import'}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Add Charity Form */}
-        {showAddCharity && (
+        {/* Import from Every.org */}
+        {showImport && (
           <View style={styles.card}>
-            <Text style={styles.cardText}>New Charity</Text>
-
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={styles.input}
-              value={newCharityName}
-              onChangeText={setNewCharityName}
-              placeholder="Charity name"
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={newCharityDescription}
-              onChangeText={setNewCharityDescription}
-              placeholder="Short description"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={4}
-            />
+            <Text style={styles.cardText}>Import from Every.org</Text>
+            <Text style={styles.cardSubtext}>
+              Automatically imports verified nonprofits with logos, descriptions, and EINs. All imports start as unapproved.
+            </Text>
 
             <Text style={styles.label}>Category</Text>
             <View style={styles.pickerContainer}>
               <Picker
-                selectedValue={newCharityCategory}
-                onValueChange={(value) => setNewCharityCategory(value)}
+                selectedValue={importCategory}
+                onValueChange={(value) => setImportCategory(value)}
                 style={styles.picker}
                 dropdownIconColor={colors.text}
               >
@@ -715,34 +673,25 @@ export default function AdminScreen() {
               </Picker>
             </View>
 
-            <Text style={styles.label}>Logo URL (optional)</Text>
+            <Text style={styles.label}>Number to Import</Text>
             <TextInput
               style={styles.input}
-              value={newCharityLogoUrl}
-              onChangeText={setNewCharityLogoUrl}
-              placeholder="https://..."
+              value={importCount}
+              onChangeText={setImportCount}
+              keyboardType="number-pad"
+              placeholder="e.g. 10"
               placeholderTextColor={colors.textSecondary}
-              autoCapitalize="none"
-            />
-            <Text style={styles.label}>Website URL (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={newCharityWebsiteUrl}
-              onChangeText={setNewCharityWebsiteUrl}
-              placeholder="https://..."
-              placeholderTextColor={colors.textSecondary}
-              autoCapitalize="none"
             />
 
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton, charityActionLoading && styles.buttonDisabled]}
-              onPress={handleAddCharity}
-              disabled={charityActionLoading}
+              style={[styles.button, styles.primaryButton, importLoading && styles.buttonDisabled]}
+              onPress={handleImportCharities}
+              disabled={importLoading}
             >
-              {charityActionLoading ? (
+              {importLoading ? (
                 <ActivityIndicator size="small" color={colors.white} />
               ) : (
-                <Text style={styles.buttonText}>Add Charity</Text>
+                <Text style={styles.buttonText}>Import Charities</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -771,7 +720,6 @@ export default function AdminScreen() {
           </View>
         ))}
       </View>
-
     </ScrollView>
   );
 }
@@ -841,10 +789,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
   },
   pickerContainer: {
     backgroundColor: colors.background,
@@ -954,5 +898,9 @@ const styles = StyleSheet.create({
   errorSubtext: {
     fontSize: typography.sizes.md,
     color: colors.textSecondary,
+  },
+  backButton: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
 });

@@ -460,6 +460,7 @@ const styles = StyleSheet.create({
   padding: spacing.sm,
   borderRadius: borderRadius.md,
   alignItems: 'center',
+  marginTop: spacing.lg,
   marginHorizontal: spacing.sm,
   marginBottom: spacing.xxl,
   borderWidth: 1,
