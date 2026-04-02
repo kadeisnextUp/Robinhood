@@ -1,9 +1,13 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import ConfirmHcaptcha from '@hcaptcha/react-native-hcaptcha';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
+
+// hCaptcha's official test sitekey 
+const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -11,11 +15,13 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // read the returnTo param 
+  const captchaRef = useRef(null);
+
+  // read the returnTo param
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
-
-  const handleSignup = async () => {
+  // when the user taps Sign Up — validates fields, then triggers captcha
+  const handleSignup = () => {
     if (!email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -31,10 +37,50 @@ export default function SignupScreen() {
       return;
     }
 
+    // all validation passed — show the captcha
+    captchaRef.current?.show();
+  };
+
+  // called by hCaptcha with the result
+  const onCaptchaMessage = async (event: any) => {
+    if (!event?.nativeEvent?.data) return;
+
+    const data = event.nativeEvent.data;
+
+    if (data === 'open') {
+      // challenge modal is showing 
+      return;
+    }
+
+    if (data === 'challenge-closed') {
+      // user dismissed the challenge without completing it
+      captchaRef.current?.hide();
+      return;
+    }
+
+    if (event.success) {
+      // Captcha passed 
+      captchaRef.current?.hide();
+      event.markUsed(); 
+
+      await submitSignup(data); // data is the captcha token
+    } else {
+      // an error occurred (network issue, expired, etc.)
+      captchaRef.current?.hide();
+      Alert.alert('Verification Failed', 'Captcha could not be completed. Please try again.');
+    }
+  };
+
+  // submits the signup to Supabase, passing the captcha token.
+  const submitSignup = async (captchaToken: string) => {
     setLoading(true);
+
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password: password,
+      options: {
+        captchaToken,
+      },
     });
 
     setLoading(false);
@@ -52,12 +98,13 @@ export default function SignupScreen() {
 
   return (
     <View style={styles.container}>
-        <TouchableOpacity 
-                style={styles.backButton}
-                onPress={() => router.back()}
-              >
-                <Ionicons name="arrow-back" size={32} color={colors.secondary} />
-              </TouchableOpacity>   
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
+        <Ionicons name="arrow-back" size={32} color={colors.secondary} />
+      </TouchableOpacity>
+
       <Text style={styles.title}>Create Account</Text>
       <Text style={styles.subtitle}>Join the charity voting community</Text>
 
@@ -86,8 +133,8 @@ export default function SignupScreen() {
         secureTextEntry
       />
 
-      <TouchableOpacity 
-        style={styles.button} 
+      <TouchableOpacity
+        style={styles.button}
         onPress={handleSignup}
         disabled={loading}
       >
@@ -101,6 +148,14 @@ export default function SignupScreen() {
           Already have an account? <Text style={styles.linkBold}>Login</Text>
         </Text>
       </TouchableOpacity>
+
+      {/* hCaptcha renders invisibly until triggered by captchaRef.current?.show() */}
+      <ConfirmHcaptcha
+        ref={captchaRef}
+        siteKey={HCAPTCHA_SITE_KEY}
+        languageCode="en"
+        onMessage={onCaptchaMessage}
+      />
     </View>
   );
 }
@@ -135,7 +190,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 50,  // Adjust this value based on your device
+    top: 50,
     left: 20,
     zIndex: 10,
     padding: 8,

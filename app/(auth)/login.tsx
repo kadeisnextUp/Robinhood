@@ -1,28 +1,68 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import ConfirmHcaptcha from '@hcaptcha/react-native-hcaptcha';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
+
+// test key
+const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Read the returnTo param if it was passed from the vote/donation screen 
+  const captchaRef = useRef(null);
+
+  // read the returnTo param if it was passed from the vote/donation screen
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
-  const handleLogin = async () => {
+  // validates fields then triggers captcha
+  const handleLogin = () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
+    captchaRef.current?.show();
+  };
+
+  // called by hCaptcha with the result
+  const onCaptchaMessage = async (event: any) => {
+    if (!event?.nativeEvent?.data) return;
+
+    const data = event.nativeEvent.data;
+
+    if (data === 'open') return;
+
+    if (data === 'challenge-closed') {
+      captchaRef.current?.hide();
+      return;
+    }
+
+    if (event.success) {
+      captchaRef.current?.hide();
+      event.markUsed();
+
+      // dat is the capcha token
+      await submitLogin(data); 
+    } else {
+      captchaRef.current?.hide();
+      Alert.alert('Verification Failed', 'Captcha could not be completed. Please try again.');
+    }
+  };
+
+  const submitLogin = async (captchaToken: string) => {
     setLoading(true);
+
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      password: password,
+      password,
+      options: {
+        captchaToken, 
+      },
     });
 
     setLoading(false);
@@ -36,7 +76,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.back()}
       >
@@ -65,8 +105,8 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
-        <TouchableOpacity 
-          style={styles.button} 
+        <TouchableOpacity
+          style={styles.button}
           onPress={handleLogin}
           disabled={loading}
         >
@@ -75,15 +115,23 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push({ 
-          pathname: '/(auth)/signup', 
-          params: { returnTo: returnTo ?? '/(tabs)' } 
-          })}>
+        <TouchableOpacity onPress={() => router.push({
+          pathname: '/(auth)/signup',
+          params: { returnTo: returnTo ?? '/(tabs)' }
+        })}>
           <Text style={styles.linkText}>
             Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* hCaptcha renders invisibly until triggered by captchaRef.current?.show() */}
+      <ConfirmHcaptcha
+        ref={captchaRef}
+        siteKey={HCAPTCHA_SITE_KEY}
+        languageCode="en"
+        onMessage={onCaptchaMessage}
+      />
     </View>
   );
 }
@@ -95,10 +143,10 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 50,  // Adjust this value based on your device
+    top: 50,
     left: 20,
     zIndex: 10,
-    padding: 8,  // Makes it easier to tap
+    padding: 8,
   },
   content: {
     flex: 1,
@@ -145,6 +193,6 @@ const styles = StyleSheet.create({
   },
   linkBold: {
     color: colors.primary,
-    fontWeight: typography.weights.bold ,
+    fontWeight: typography.weights.bold,
   },
 });
