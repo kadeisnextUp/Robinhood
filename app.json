@@ -4,7 +4,7 @@
     "slug": "RobinHood",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/charity-fund-app-icon.png",
+    "icon": "./assets/images/Fund-It-app-icon.png",
     "scheme": "fundit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -28,14 +28,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/charity-fund-app-icon.png"
+      "favicon": "./assets/images/Fund-It-app-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/charity-fund-splash-icon.png",
+          "image": "./assets/images/Fund-It-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#8C673A",
