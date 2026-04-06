@@ -82,10 +82,10 @@ Deno.serve(async (req) => {
           },
         ],
         application_context: {
-          brand_name: 'CharityFund',
+          brand_name: 'Fund-It',
           user_action: 'PAY_NOW',
-          return_url: 'charityfund://donate/success',
-          cancel_url: 'charityfund://donate/cancel',
+          return_url: 'fundit://donate/success',
+          cancel_url: 'fundit://donate/cancel',
         },
       }),
     });

@@ -2,7 +2,6 @@ import { useAuth } from '@/contexts/authContext';
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -16,30 +15,6 @@ import {
   View,
 } from 'react-native';
 
-const CATEGORY_OPTIONS = [
-  'Environment',
-  'Healthcare',
-  'Food Security',
-  'Animal Welfare',
-  'Education',
-  'Human Rights',
-  'Disaster Relief',
-  'Housing & Homelessness',
-  'American Indian',
-  'Arts & Culture',
-  'Health & Medical',
-  'Disabilities',
-  'Children & Youth',
-  'Civil Rights',
-  'Community Development',
-  'Elderly',
-  'Human Services',
-  'Legal & Public Interest',
-  'Public Safety',
-  'Religious',
-  'Veterans & Military',
-  'Relief & Development',
-];
 
 export default function AdminScreen() {
   const { session } = useAuth();
@@ -58,9 +33,15 @@ export default function AdminScreen() {
   // charity management state
   const [charities, setCharities] = useState([]);
 
-  // import from Every.org state
+  // pending nominations state
+  const [pendingNominations, setPendingNominations] = useState<any[]>([]);
+  const [nominationActionLoading, setNominationActionLoading] = useState<string | null>(null);
+
+  // import from CharityAPI state
   const [showImport, setShowImport] = useState(false);
-  const [importCategory, setImportCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [importQuery, setImportQuery] = useState('');
+  const [importState, setImportState] = useState('');
+  const [importCity, setImportCity] = useState('');
   const [importCount, setImportCount] = useState('10');
 
   const [importLoading, setImportLoading] = useState(false);
@@ -93,7 +74,7 @@ export default function AdminScreen() {
       setIsAdmin(data.is_admin);
 
       if (data.is_admin) {
-        await Promise.all([loadPeriods(), loadCharities(), loadDonationsHistory()]);
+        await Promise.all([loadPeriods(), loadCharities(), loadDonationsHistory(), loadPendingNominations()]);
       }
     } catch (err) {
       console.error('Admin check error:', err);
@@ -236,6 +217,7 @@ export default function AdminScreen() {
       const { data, error } = await supabase
         .from('charities')
         .select('id, name, category, is_approved')
+        .eq('is_approved', true)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -243,6 +225,96 @@ export default function AdminScreen() {
     } catch (err) {
       console.error('Load charities error:', err);
     }
+  };
+
+  const loadPendingNominations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('charities')
+        .select(`
+          id, name, ein, description, logo_url, website_url, category,
+          nominations(id, status)
+        `)
+        .eq('is_approved', false);
+
+      if (error) throw error;
+
+      // Only show charities that have at least one pending nomination
+      const withPending = (data ?? []).filter((c: any) =>
+        c.nominations?.some((n: any) => n.status === 'pending')
+      );
+
+      setPendingNominations(withPending);
+    } catch (err) {
+      console.error('Load pending nominations error:', err);
+    }
+  };
+
+  const isCharityComplete = (charity: any) =>
+    !!(
+      charity.name?.trim() &&
+      charity.ein?.trim() &&
+      charity.description?.trim() &&
+      charity.logo_url?.trim() &&
+      charity.website_url?.trim() &&
+      charity.category?.trim()
+    );
+
+  const handleApproveNomination = async (charityId: string, charityName: string) => {
+    Alert.alert(
+      'Approve Charity',
+      `Approve "${charityName}" and make it eligible for voting?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            setNominationActionLoading(charityId + '_approve');
+            try {
+              const { error } = await supabase.functions.invoke('approve-charity', {
+                body: { charity_id: charityId },
+              });
+              if (error) throw error;
+              Alert.alert('Approved', `${charityName} is now pool-eligible. Nominators have been notified.`);
+              await Promise.all([loadCharities(), loadPendingNominations()]);
+            } catch (err: any) {
+              Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to approve charity.');
+            } finally {
+              setNominationActionLoading(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectNomination = async (charityId: string, charityName: string) => {
+    Alert.alert(
+      'Reject Charity',
+      `Reject the nomination for "${charityName}"? Nominators will be notified.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setNominationActionLoading(charityId + '_reject');
+            try {
+              const { error } = await supabase.functions.invoke('reject-charity', {
+                body: { charity_id: charityId },
+              });
+              if (error) throw error;
+              Alert.alert('Rejected', `Nomination for ${charityName} has been rejected. Nominators have been notified.`);
+              await loadPendingNominations();
+            } catch (err: any) {
+              Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to reject charity.');
+            } finally {
+              setNominationActionLoading(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const loadDonationsHistory = async () => {
@@ -342,10 +414,14 @@ export default function AdminScreen() {
       Alert.alert('Error', 'Please enter a count between 1 and 50.');
       return;
     }
+    if (!importQuery.trim()) {
+      Alert.alert('Error', 'Please enter a search term or EIN.');
+      return;
+    }
 
     Alert.alert(
       'Import Charities',
-      `Import up to ${count} "${importCategory}" charities from Every.org?`,
+      `Import up to ${count} charities matching "${importQuery.trim()}" from CharityAPI?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -353,12 +429,11 @@ export default function AdminScreen() {
           onPress: async () => {
             setImportLoading(true);
             try {
-              const { data, error } = await supabase.functions.invoke('import-charities', {
-                body: {
-                  category: importCategory,
-                  count,
-                },
-              });
+              const body: any = { query: importQuery.trim(), count };
+              if (importState.trim()) body.state = importState.trim().toUpperCase();
+              if (importCity.trim()) body.city = importCity.trim();
+
+              const { data, error } = await supabase.functions.invoke('import-charities', { body });
 
               if (error) throw error;
 
@@ -366,9 +441,12 @@ export default function AdminScreen() {
                 'Import Complete',
                 `${data.inserted} ${data.inserted === 1 ? 'charity' : 'charities'} imported and pending approval.`
               );
+              setImportQuery('');
+              setImportState('');
+              setImportCity('');
               setImportCount('10');
               setShowImport(false);
-              await loadCharities();
+              await loadPendingNominations();
             } catch (err) {
               Alert.alert('Error', err.message || 'Import failed.');
             } finally {
@@ -639,6 +717,73 @@ export default function AdminScreen() {
         )}
       </View>
 
+      {/* Pending Nominations */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Pending Nominations</Text>
+        {pendingNominations.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardSubtext}>No pending nominations.</Text>
+          </View>
+        ) : (
+          pendingNominations.map((charity: any) => {
+            const complete = isCharityComplete(charity);
+            const nominationCount = charity.nominations?.filter((n: any) => n.status === 'pending').length ?? 0;
+            const isApprovingThis = nominationActionLoading === charity.id + '_approve';
+            const isRejectingThis = nominationActionLoading === charity.id + '_reject';
+
+            return (
+              <View key={charity.id} style={styles.card}>
+                <Text style={styles.cardText}>{charity.name}</Text>
+                <Text style={styles.cardSubtext}>EIN: {charity.ein ?? 'Not set'}</Text>
+                <Text style={styles.cardSubtext}>
+                  {nominationCount} user{nominationCount !== 1 ? 's' : ''} nominated this charity
+                </Text>
+                {!complete && (
+                  <Text style={styles.incompleteWarning}>
+                    Fill in all fields via Supabase dashboard to enable approval.
+                  </Text>
+                )}
+                <View style={styles.rowButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      styles.primaryButton,
+                      styles.halfButton,
+                      (!complete || nominationActionLoading !== null) && styles.buttonDisabled,
+                    ]}
+                    onPress={() => handleApproveNomination(charity.id, charity.name)}
+                    disabled={!complete || nominationActionLoading !== null}
+                  >
+                    {isApprovingThis ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.buttonText}>Approve</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      styles.dangerButton,
+                      styles.halfButton,
+                      nominationActionLoading !== null && styles.buttonDisabled,
+                    ]}
+                    onPress={() => handleRejectNomination(charity.id, charity.name)}
+                    disabled={nominationActionLoading !== null}
+                  >
+                    {isRejectingThis ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.buttonText}>Reject</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </View>
+
       {/* Charity Management */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -651,27 +796,43 @@ export default function AdminScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Import from Every.org */}
+        {/* Import from CharityAPI */}
         {showImport && (
           <View style={styles.card}>
-            <Text style={styles.cardText}>Import from Every.org</Text>
+            <Text style={styles.cardText}>Import from CharityAPI</Text>
             <Text style={styles.cardSubtext}>
-              Automatically imports verified nonprofits with logos, descriptions, and EINs. All imports start as unapproved.
+              Search by name or EIN. Imports name and EIN only — fill in remaining fields via the Supabase dashboard before approving.
             </Text>
 
-            <Text style={styles.label}>Category</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={importCategory}
-                onValueChange={(value) => setImportCategory(value)}
-                style={styles.picker}
-                dropdownIconColor={colors.text}
-              >
-                {CATEGORY_OPTIONS.map((cat) => (
-                  <Picker.Item key={cat} label={cat} value={cat} />
-                ))}
-              </Picker>
-            </View>
+            <Text style={styles.label}>Search Term or EIN (required)</Text>
+            <TextInput
+              style={styles.input}
+              value={importQuery}
+              onChangeText={setImportQuery}
+              placeholder="e.g. food bank  or  12-3456789"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.label}>State (optional, 2-letter code)</Text>
+            <TextInput
+              style={styles.input}
+              value={importState}
+              onChangeText={setImportState}
+              placeholder="e.g. CA"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="characters"
+              maxLength={2}
+            />
+
+            <Text style={styles.label}>City (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={importCity}
+              onChangeText={setImportCity}
+              placeholder="e.g. Los Angeles"
+              placeholderTextColor={colors.textSecondary}
+            />
 
             <Text style={styles.label}>Number to Import</Text>
             <TextInput
@@ -888,6 +1049,12 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semiBold,
+  },
+  incompleteWarning: {
+    fontSize: typography.sizes.xs,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    fontStyle: 'italic',
   },
   errorText: {
     fontSize: typography.sizes.xxl,

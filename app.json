@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "CharityFund",
+    "name": "Fund-It",
     "slug": "RobinHood",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/charity-fund-app-icon.png",
-    "scheme": "charityfund",
+    "scheme": "fundit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sawyerkd.appCharityFund",
+      "bundleIdentifier": "com.sawyerkd.appFundIt",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sawyerkd.appRobinHood"
+      "package": "com.sawyerkd.appFundIt"
     },
     "web": {
       "output": "static",
@@ -37,14 +37,15 @@
         {
           "image": "./assets/images/charity-fund-splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",    
+          "resizeMode": "contain",
           "backgroundColor": "#8C673A",
           "dark": {
             "backgroundColor": "#8C673A"
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

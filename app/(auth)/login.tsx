@@ -86,7 +86,7 @@ export default function LoginScreen() {
       {/* Centered content */}
       <View style={styles.content}>
         <Text style={styles.title}>Welcome Back!</Text>
-        <Text style={styles.subtitle}>Login to use Robinhood</Text>
+        <Text style={styles.subtitle}>Login to use Fund-It</Text>
 
         <TextInput
           style={styles.input}

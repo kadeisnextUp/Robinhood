@@ -146,7 +146,7 @@ export default function DonateScreen() {
         //open PayPal checkout in the browser
         const result = await WebBrowser.openAuthSessionAsync(
           sessionData.approvalUrl,
-          'charityfund://donate/success'
+          'fundit://donate/success'
         );
 
         // if user completed payment, capture it
