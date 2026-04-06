@@ -45,7 +45,7 @@ No unit test framework is configured. Manual testing uses development builds (`e
 
 **PayPal donation flow:**
 1. Donate screen → `create-paypal-order` edge function → PayPal approval URL
-2. Deep link redirect to `charityfund://donate/success`
+2. Deep link redirect to `fundit://donate/success`
 3. `capture-paypal-order` edge function → records to `user_donations`
 
 **Key database tables:** `voting_periods`, `voting_period_charities`, `charities`, `votes`, `user_donations`

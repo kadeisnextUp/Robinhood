@@ -7,6 +7,14 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 import { useAuth } from '../../contexts/authContext';
 import { supabase } from '../../services/supabase';
 
+interface Nomination {
+  id: string;
+  charityName: string;
+  ein: string;
+  status: 'pending' | 'approved' | 'rejected';
+  date: string;
+}
+
 interface Profile {
   isAdmin: boolean;
   name: string;
@@ -16,6 +24,7 @@ interface Profile {
   totalDonated: number;
   charitiesVoted: number;
   recentDonations: Array<{ id: string; charity: string; amount: number; date: string }>;
+  nominations: Nomination[];
 }
 
 export default function ProfileScreen() {
@@ -84,6 +93,22 @@ export default function ProfileScreen() {
         .order('donated_at', { ascending: false })
         .limit(5);
 
+      // fetch user's nominations with charity name and EIN
+      const { data: nominationData, error: nomError } = await supabase
+        .from('nominations')
+        .select(`
+          id,
+          status,
+          created_at,
+          charities (
+            name,
+            ein
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+
       setProfile({
         isAdmin: profileData?.is_admin ?? false,
         name: profileData?.name || 'User',
@@ -97,6 +122,17 @@ export default function ProfileScreen() {
           charity: d.charities.name,
           amount: d.amount,
           date: new Date(d.donated_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        })) ?? [],
+        nominations: nominationData?.map((n) => ({
+          id: n.id,
+          charityName: n.charities?.name ?? 'Unknown',
+          ein: n.charities?.ein ?? '',
+          status: n.status,
+          date: new Date(n.created_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
@@ -242,6 +278,46 @@ export default function ProfileScreen() {
             </ScrollView>
           ) : (
             <Text style={styles.emptyText}>No donations yet</Text>
+          )}
+        </View>
+
+        <View style={styles.recentDonationsContainer}>
+          <Text style={styles.donationsSectionTitle}>My Nominations</Text>
+          <View style={styles.divider} />
+          {profile.nominations.length > 0 ? (
+            <ScrollView
+              style={styles.recentDonations}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
+              {profile.nominations.map((nom) => {
+                const statusEmoji = nom.status === 'approved' ? '✅' : nom.status === 'rejected' ? '❌' : '⏳';
+                return (
+                  <View key={nom.id} style={styles.donationItem}>
+                    <Text style={styles.donationCharity}>{nom.charityName}</Text>
+                    {nom.ein ? <Text style={styles.donationDate}>EIN: {nom.ein}</Text> : null}
+                    <View style={styles.nominationRow}>
+                      <Text style={styles.donationDate}>{nom.date}</Text>
+                      <View style={styles.statusColumn}>
+                        <Text style={styles.nominationEmoji}>{statusEmoji}</Text>
+                        <View style={[
+                          styles.statusBadge,
+                          nom.status === 'approved' && styles.statusApproved,
+                          nom.status === 'rejected' && styles.statusRejected,
+                          nom.status === 'pending' && styles.statusPending,
+                        ]}>
+                          <Text style={styles.statusText}>
+                            {nom.status.charAt(0).toUpperCase() + nom.status.slice(1)}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <Text style={styles.emptyText}>No nominations yet</Text>
           )}
         </View>
       </ScrollView>
@@ -411,6 +487,39 @@ const styles = StyleSheet.create({
   donationDate: {
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
+  },
+  nominationEmoji: {
+    fontSize: 20,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  statusColumn: {
+    alignItems: 'center',
+  },
+  nominationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  statusApproved: {
+    backgroundColor: colors.success,
+  },
+  statusRejected: {
+    backgroundColor: colors.error,
+  },
+  statusPending: {
+    backgroundColor: colors.textSecondary,
+  },
+  statusText: {
+    color: colors.white,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semiBold,
   },
   notLoggedInTitle: {
     fontSize: typography.sizes.xxl,

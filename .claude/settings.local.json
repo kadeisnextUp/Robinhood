@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:charityapi.org)",
+      "WebFetch(domain:api.charityapi.org)"
+    ]
+  }
+}

@@ -1,10 +1,10 @@
-# FundIt - Charity Voting App
+# Fund-It - Charity Voting App
 
 A mobile application that democratizes charitable giving through community voting and user donations.
 
 ## Overview
 
-FundIt allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
+Fund-It allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
 
 ## Features
 
@@ -31,6 +31,7 @@ FundIt allows users to vote weekly on their favorite charities from a rotating l
 ### Target Platforms
 - iOS (App Store)
 - Android (Google Play Store)
+- webiste
 
 
 
@@ -56,8 +57,8 @@ FundIt allows users to vote weekly on their favorite charities from a rotating l
 
 ### Month 4: Payments & Advanced Features
 - [ ] Paypal integration for donations
-- [ ] Charity suggestion system
-- [ ] Upvoting mechanism
+- [x] Charity suggestion system
+- [x] Upvoting mechanism
 - [x] Admin tools for weekly management
 
 ### Month 5: Polish & Launch
