@@ -1,122 +1,95 @@
 // supabase/functions/import-charities/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const EVERY_ORG_BASE = "https://partners.every.org/v0.2";
+const CHARITYAPI_BASE = "https://api.charityapi.org/api";
 
-const CATEGORY_MAP: Record<string, string[]> = {
-  "Environment":             ["environment", "climate", "conservation", "oceans", "water", "wildlife", "parks"],
-  "Healthcare":              ["health", "disease", "mental-health", "womens-health", "research"],
-  "Food Security":           ["food-security"],
-  "Animal Welfare":          ["animals", "cats", "dogs", "wildlife"],
-  "Education":               ["education", "libraries", "science", "research"],
-  "Human Rights":            ["humans", "justice", "racial-justice", "gender-equality", "votingrights", "freepress"],
-  "Disaster Relief":         ["wildfires", "hurricane-ian", "coronavirus", "ukraine", "refugees"],
-  "Housing & Homelessness":  ["housing", "poverty"],
-  "American Indian":         ["indigenous-peoples", "indigenous-led"],
-  "Arts & Culture":          ["art", "culture", "dance", "music", "theater", "filmandtv", "museums", "radio"],
-  "Health & Medical":        ["health", "disease", "cancer", "mental-health", "research"],
-  "Disabilities":            ["disabilities", "autism"],
-  "Children & Youth":        ["youth", "adoption"],
-  "Civil Rights":            ["justice", "racial-justice", "votingrights", "gender-equality", "lgbt", "transgender"],
-  "Community Development":   ["humans", "poverty", "immigrants", "refugees"],
-  "Elderly":                 ["seniors"],
-  "Human Services":          ["humans", "poverty", "mental-health", "refugees", "immigrants"],
-  "Legal & Public Interest": ["legal", "justice", "freepress", "votingrights"],
-  "Public Safety":           ["humans", "justice"],
-  "Religious":               ["religion", "christianity", "islam", "judaism", "hinduism", "buddhism"],
-  "Veterans & Military":     ["veterans"],
-  "Relief & Development":    ["refugees", "immigrants", "ukraine", "afghanistan", "hurricane-ian", "wildfires"],
-};
-
-const isComplete = (org: any): boolean => {
-  return (
-    !!org.name?.trim() &&
-    !!org.ein?.trim() &&
-    !!org.description?.trim() &&
-    !!org.logoUrl?.trim() &&
-    !!org.websiteUrl?.trim()
-  );
-};
+// detect if a string looks like an EIN (XX-XXXXXXX or XXXXXXXXX)
+const isEIN = (s: string): boolean => /^\d{2}-?\d{7}$/.test(s.trim());
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const { category, count = 10 } = await req.json();
+  const { query, ein, state, city, count = 10 } = await req.json();
 
-  if (!category) {
+  if (!query && !ein) {
     return new Response(
-      JSON.stringify({ error: "category is required" }),
+      JSON.stringify({ error: "Either 'query' (name/term) or 'ein' is required" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const causes = CATEGORY_MAP[category];
-
-  if (!causes) {
-    return new Response(
-      JSON.stringify({
-        error: `Unknown category: "${category}". Valid options are: ${Object.keys(CATEGORY_MAP).join(", ")}`,
-      }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
-  }
+  const apiKey = Deno.env.get("CHARITYAPI_KEY")!;
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Fetch more than requested to account for incomplete records being filtered out
-  const fetchCount = Math.min(count * 3, 100);
+  let orgs: any[] = [];
 
-  const params = new URLSearchParams({
-    causes: causes.join(","),
-    take: String(fetchCount),
-    apiKey: Deno.env.get("EVERY_ORG_API_KEY")!,
-  });
+  if (ein || (query && isEIN(query))) {
+    // EIN lookup 
+    const einVal = (ein || query).replace("-", "");
+    const url = `${CHARITYAPI_BASE}/organizations/${encodeURIComponent(einVal)}`;
+    const res = await fetch(url, { headers: { apikey: apiKey } });
 
-  const url = `${EVERY_ORG_BASE}/search/${encodeURIComponent(category)}?${params}`;
-  const everyOrgRes = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
+      return new Response(
+        JSON.stringify({ error: "CharityAPI request failed", detail: text }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
-  if (!everyOrgRes.ok) {
-    const text = await everyOrgRes.text();
-    return new Response(
-      JSON.stringify({ error: "Every.org API request failed", detail: text }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
-    );
+    const parsed = await res.json();
+    const inner = parsed?.data ?? parsed;
+    orgs = Array.isArray(inner) ? inner : inner ? [inner] : [];
+  } else {
+    // name/term search with optional state and city filters
+    const params = new URLSearchParams();
+    if (state) params.set("state", state);
+    if (city) params.set("city", city);
+
+    const url = `${CHARITYAPI_BASE}/organizations/search/${encodeURIComponent(query)}?${params}`;
+    const res = await fetch(url, { headers: { apikey: apiKey } });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return new Response(
+        JSON.stringify({ error: "CharityAPI request failed", detail: text }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const parsed = await res.json();
+    const inner = parsed?.data ?? parsed;
+    orgs = Array.isArray(inner) ? inner : [];
   }
 
-  const data = await everyOrgRes.json();
-  const nonprofits = data.nonprofits ?? [];
-
-  // Filter to only complete records then trim to requested count
-  const complete = nonprofits
-    .filter(isComplete)
+  // filter to records that have at minimum a name and EIN
+  const valid = orgs
+    .filter((o: any) => o.name?.trim() && o.ein?.trim())
     .slice(0, count);
 
-  if (complete.length === 0) {
+  if (valid.length === 0) {
     return new Response(
-      JSON.stringify({ inserted: 0, message: "No complete records found from Every.org for this query" }),
+      JSON.stringify({ inserted: 0, message: "No valid records found from CharityAPI for this query" }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  const rows = complete.map((org: any) => ({
-    name: org.name.trim(),
-    ein: org.ein.trim(),
-    description: org.description.trim(),
-    category: category,
-    website_url: org.websiteUrl.trim(),
-    logo_url: org.logoUrl.trim(),
+  const rows = valid.map((o: any) => ({
+    name: o.name.trim(),
+    ein: o.ein.replace(/-/g, "").replace(/^(\d{2})(\d{7})$/, "$1-$2"),
     is_approved: false,
   }));
 
   const { data: inserted, error } = await supabase
     .from("charities")
-    .upsert(rows, { onConflict: "name", ignoreDuplicates: true })
-    .select("id, name, logo_url");
+    .upsert(rows, { onConflict: "ein", ignoreDuplicates: true })
+    .select("id, name, ein");
 
   if (error) {
     return new Response(
@@ -128,7 +101,7 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       inserted: inserted?.length ?? 0,
-      skipped: nonprofits.length - complete.length,
+      skipped: valid.length - (inserted?.length ?? 0),
       charities: inserted,
     }),
     { status: 200, headers: { "Content-Type": "application/json" } }
