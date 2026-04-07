@@ -145,7 +145,7 @@ export default function AdminScreen() {
             setActionLoading(true);
             try {
               const response = await fetch(
-                'https://cmnmabsemvdzgwrjjwiw.supabase.co/functions/v1/create-voting-period',
+                `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-voting-period`,
                 {
                   method: 'POST',
                   headers: {
@@ -185,7 +185,7 @@ export default function AdminScreen() {
             setActionLoading(true);
             try {
               const response = await fetch(
-                'https://cmnmabsemvdzgwrjjwiw.supabase.co/functions/v1/close-voting-period',
+                `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/close-voting-period`,
                 {
                   method: 'POST',
                   headers: {
