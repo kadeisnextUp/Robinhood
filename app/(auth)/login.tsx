@@ -6,8 +6,7 @@ import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
 
-// test key
-const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001';
+const HCAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_HCAPTCHA_SITE_KEY ?? '10000000-ffff-ffff-ffff-000000000001';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
