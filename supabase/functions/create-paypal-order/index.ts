@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const PAYPAL_BASE_URL = 'https://api-m.sandbox.paypal.com'; // switch to https://api-m.paypal.com in production
+const PAYPAL_BASE_URL = 'https://api-m.paypal.com';
 
 // get a PayPal access token using client credentials
 async function getPayPalAccessToken(): Promise<string> {
