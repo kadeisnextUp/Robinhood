@@ -4,7 +4,7 @@ A mobile application that democratizes charitable giving through community votin
 
 ## Overview
 
-Fund-It allows users to vote weekly on their favorite charities from a rotating list. Donations are pooled from ad revenue and direct contributions, with all funds going to the winning charity each week. Full transparency is provided through public donation receipts.
+Fund-It allows users to vote weekly on their favorite charities from a rotating list. Donations from direct contributions go entirely to the winning charity each week. Full transparency is provided through public donation receipts.
 
 ## Features
 
@@ -24,9 +24,8 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 ### Backend
 - **Supabase** (PostgreSQL database, Authentication, Storage)
 
-### Payment & Monetization (Planned not final)
-- **Paypal** for direct donations
-- **Google AdMob** for ad revenue
+### Payments
+- **PayPal** for direct donations
 
 ### Target Platforms
 - iOS (App Store)
@@ -52,7 +51,6 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 ### Month 3: Core Features
 - [x] Voting mechanism (one vote per user per week)
 - [x] Weekly rotation logic
-- [ ] AdMob integration
 - [x] Vote tracking and results
 
 ### Month 4: Payments & Advanced Features
