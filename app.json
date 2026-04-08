@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sawyerkd.appFundIt",
+      "appleTeamId": "TMA6X93UYH",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
