@@ -45,8 +45,6 @@ app-example
 /ios
 /android
 
-app.json
-
 # AI assistant files
 CLAUDE.md
 AGENTS.md
