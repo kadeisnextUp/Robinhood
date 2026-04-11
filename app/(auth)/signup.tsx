@@ -1,12 +1,9 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import ConfirmHcaptcha from '@hcaptcha/react-native-hcaptcha';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
-
-const HCAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_HCAPTCHA_SITE_KEY ?? '10000000-ffff-ffff-ffff-000000000001';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -14,11 +11,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const captchaRef = useRef<any>(null);
-
-  const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
-
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -34,35 +27,12 @@ export default function SignupScreen() {
       return;
     }
 
-    captchaRef.current?.show();
-  };
-
-  const onCaptchaMessage = async (event: any) => {
-    const data = event?.nativeEvent?.data;
-
-    if (!data || data === 'open') return;
-
-    captchaRef.current?.hide();
-
-    if (data === 'challenge-closed' || data === 'cancel') return;
-
-    if (data === 'error') {
-      Alert.alert('Verification Failed', 'Captcha could not be completed. Please try again.');
-      return;
-    }
-
-    // data is the captcha token
-    await submitSignup(data);
-  };
-
-  const submitSignup = async (captchaToken: string) => {
     setLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { captchaToken },
       });
 
       if (error) {
@@ -136,14 +106,6 @@ export default function SignupScreen() {
           Already have an account? <Text style={styles.linkBold}>Login</Text>
         </Text>
       </TouchableOpacity>
-
-      <ConfirmHcaptcha
-        ref={captchaRef}
-        siteKey={HCAPTCHA_SITE_KEY}
-        size="normal"
-        languageCode="en"
-        onMessage={onCaptchaMessage}
-      />
     </View>
   );
 }
