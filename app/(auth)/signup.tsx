@@ -14,12 +14,10 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const captchaRef = useRef(null);
+  const captchaRef = useRef<any>(null);
 
-  // read the returnTo param
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
-  // when the user taps Sign Up — validates fields, then triggers captcha
   const handleSignup = () => {
     if (!email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -36,62 +34,50 @@ export default function SignupScreen() {
       return;
     }
 
-    // all validation passed — show the captcha
     captchaRef.current?.show();
   };
 
-  // called by hCaptcha with the result
   const onCaptchaMessage = async (event: any) => {
-    if (!event?.nativeEvent?.data) return;
+    const data = event?.nativeEvent?.data;
 
-    const data = event.nativeEvent.data;
+    if (!data || data === 'open') return;
 
-    if (data === 'open') {
-      // challenge modal is showing 
-      return;
-    }
+    captchaRef.current?.hide();
 
-    if (data === 'challenge-closed') {
-      // user dismissed the challenge without completing it
-      captchaRef.current?.hide();
-      return;
-    }
+    if (data === 'challenge-closed' || data === 'cancel') return;
 
-    if (event.success) {
-      // Captcha passed 
-      captchaRef.current?.hide();
-      event.markUsed(); 
-
-      await submitSignup(data); // data is the captcha token
-    } else {
-      // an error occurred (network issue, expired, etc.)
-      captchaRef.current?.hide();
+    if (data === 'error') {
       Alert.alert('Verification Failed', 'Captcha could not be completed. Please try again.');
+      return;
     }
+
+    // data is the captcha token
+    await submitSignup(data);
   };
 
-  // submits the signup to Supabase, passing the captcha token.
   const submitSignup = async (captchaToken: string) => {
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: password,
-      options: {
-        captchaToken,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { captchaToken },
+      });
 
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Signup Failed', error.message);
-    } else {
-      Alert.alert(
-        'Check Your Email!',
-        'We sent you a confirmation email. Please verify your email before logging in.',
-        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
-      );
+      if (error) {
+        Alert.alert('Signup Failed', error.message);
+      } else {
+        Alert.alert(
+          'Check Your Email!',
+          'We sent you a confirmation email. Please verify your email before logging in.',
+          [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Signup Failed', e?.message ?? 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,6 +96,7 @@ export default function SignupScreen() {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={colors.grey}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -119,6 +106,7 @@ export default function SignupScreen() {
       <TextInput
         style={styles.input}
         placeholder="Password (min 6 characters)"
+        placeholderTextColor={colors.grey}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -127,6 +115,7 @@ export default function SignupScreen() {
       <TextInput
         style={styles.input}
         placeholder="Confirm Password"
+        placeholderTextColor={colors.grey}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
@@ -148,10 +137,10 @@ export default function SignupScreen() {
         </Text>
       </TouchableOpacity>
 
-      {/* hCaptcha renders invisibly until triggered by captchaRef.current?.show() */}
       <ConfirmHcaptcha
         ref={captchaRef}
         siteKey={HCAPTCHA_SITE_KEY}
+        size="normal"
         languageCode="en"
         onMessage={onCaptchaMessage}
       />
@@ -174,12 +163,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: typography.sizes.md,
-    color: colors.textSecondary,
+    color: colors.textLight,
     marginBottom: 40,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBackground,
     padding: 15,
     borderRadius: 10,
     marginBottom: spacing.md,
@@ -202,17 +191,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   buttonText: {
-    color: colors.textOnPrimary,
+    color: colors.white,
     fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
+    fontWeight: typography.weights.bold as any,
   },
   linkText: {
     marginTop: 20,
     textAlign: 'center',
-    color: colors.textSecondary,
+    color: colors.textLight,
   },
   linkBold: {
     color: colors.primary,
-    fontWeight: typography.weights.bold,
+    fontWeight: typography.weights.bold as any,
   },
 });
