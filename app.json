@@ -38,7 +38,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/Fund-It-logo.png",
-          "imageWidth": 200,
+          "imageWidth": 500,
           "resizeMode": "contain",
           "backgroundColor": "#8C673A",
           "dark": {
