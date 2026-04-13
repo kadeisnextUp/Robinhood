@@ -6,15 +6,15 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
 
+type VotingPeriod = { id: string; start_date: string; end_date: string };
+
 export default function DonateScreen() {
   const [donationAmount, setDonationAmount] = useState('');
   const [userDonationAmount, setUserDonationAmount] = useState(0);
   const [weeklyPool, setWeeklyPool] = useState(0);
-  const [votingPeriod, setVotingPeriod] = useState(null);
+  const [votingPeriod, setVotingPeriod] = useState<VotingPeriod | null>(null);
   const [timeRemaining, setTimeRemaining] = useState('');
-  const [loading, setLoading] = useState(true);
   const [donating, setDonating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { requireAuth, user } = useRequireAuth();
 
@@ -57,9 +57,6 @@ export default function DonateScreen() {
 
   const loadResults = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
       // get the current open voting period
       const { data: period, error: periodError } = await supabase
         .from('voting_periods')
@@ -92,9 +89,6 @@ export default function DonateScreen() {
       }
     } catch (err) {
       console.error('Error loading voting period:', err);
-      setError('Failed to load voting period. Please try again later.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -109,9 +103,6 @@ export default function DonateScreen() {
     requireAuth(async () => {
       try {
         setDonating(true);
-
-        // ensure we have a fresh access token before calling the edge function
-        await supabase.auth.refreshSession();
 
         // call Edge Function to create a PayPal order
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-order', {
@@ -193,7 +184,8 @@ export default function DonateScreen() {
 
       } catch (err) {
         console.error('Donation error:', err);
-        Alert.alert('Something went wrong', err.message || 'Please try again.');
+        const message = err instanceof Error ? err.message : 'Please try again.';
+        Alert.alert('Something went wrong', message);
       } finally {
         setDonating(false);
       }
