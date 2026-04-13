@@ -1,4 +1,16 @@
 
+[functions.create-paypal-order]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-paypal-order/deno.json"
+entrypoint = "./functions/create-paypal-order/index.ts"
+
+[functions.capture-paypal-order]
+enabled = true
+verify_jwt = true
+import_map = "./functions/capture-paypal-order/deno.json"
+entrypoint = "./functions/capture-paypal-order/index.ts"
+
 [functions.create-voting-period]
 enabled = true
 verify_jwt = true
