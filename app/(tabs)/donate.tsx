@@ -230,6 +230,8 @@ export default function DonateScreen() {
             value={donationAmount}
             onChangeText={setDonationAmount}
             editable={!donating}
+            returnKeyType="done"
+            onSubmitEditing={handleDirectDonate}
           />
         </View>
 

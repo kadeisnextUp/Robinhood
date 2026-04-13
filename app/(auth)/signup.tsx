@@ -1,19 +1,37 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
+import { isProfane } from '../../src/utils/profanity';
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 
 export default function SignupScreen() {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+
   const handleSignup = async () => {
-    if (!email || !password || !confirmPassword) {
+    if (!username || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (!USERNAME_REGEX.test(username)) {
+      Alert.alert('Error', 'Username must be 3–20 characters and can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
+
+    if (isProfane(username)) {
+      Alert.alert('Error', 'That username is not allowed');
       return;
     }
 
@@ -22,17 +40,33 @@ export default function SignupScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      Alert.alert('Error', 'Password must be at least 8 characters and include an uppercase letter, lowercase letter, and number');
       return;
     }
 
     setLoading(true);
 
     try {
+      // Check username uniqueness before creating the account
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username.toLowerCase())
+        .maybeSingle();
+
+      if (existing) {
+        Alert.alert('Error', 'That username is already taken');
+        return;
+      }
+
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          data: { username: username.toLowerCase() },
+        },
       });
 
       if (error) {
@@ -65,30 +99,54 @@ export default function SignupScreen() {
 
       <TextInput
         style={styles.input}
+        placeholder="Username (3–20 chars, letters, numbers, _ -)"
+        placeholderTextColor={colors.grey}
+        value={username}
+        onChangeText={setUsername}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
+        submitBehavior="submit"
+      />
+
+      <TextInput
+        ref={emailRef}
+        style={styles.input}
         placeholder="Email"
         placeholderTextColor={colors.grey}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <TextInput
+        ref={passwordRef}
         style={styles.input}
-        placeholder="Password (min 6 characters)"
+        placeholder="Password (min 8 chars, upper, lower, number)"
         placeholderTextColor={colors.grey}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        returnKeyType="next"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <TextInput
+        ref={confirmRef}
         style={styles.input}
         placeholder="Confirm Password"
         placeholderTextColor={colors.grey}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
+        returnKeyType="done"
+        onSubmitEditing={handleSignup}
       />
 
       <TouchableOpacity
@@ -155,7 +213,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.white,
     fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.bold,
   },
   linkText: {
     marginTop: 20,
@@ -164,6 +222,6 @@ const styles = StyleSheet.create({
   },
   linkBold: {
     color: colors.primary,
-    fontWeight: typography.weights.bold as any,
+    fontWeight: typography.weights.bold,
   },
 });

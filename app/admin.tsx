@@ -3,7 +3,7 @@ import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,6 +36,17 @@ export default function AdminScreen() {
   // pending nominations state
   const [pendingNominations, setPendingNominations] = useState<any[]>([]);
   const [nominationActionLoading, setNominationActionLoading] = useState<string | null>(null);
+
+  // record donation refs
+  const transactionIdRef = useRef<TextInput>(null);
+  const proofUrlRef = useRef<TextInput>(null);
+  // edit donation refs
+  const editTransactionIdRef = useRef<TextInput>(null);
+  const editProofUrlRef = useRef<TextInput>(null);
+  // import refs
+  const importStateRef = useRef<TextInput>(null);
+  const importCityRef = useRef<TextInput>(null);
+  const importCountRef = useRef<TextInput>(null);
 
   // import from CharityAPI state
   const [showImport, setShowImport] = useState(false);
@@ -602,25 +613,35 @@ export default function AdminScreen() {
               keyboardType="decimal-pad"
               placeholder="e.g. 500.00"
               placeholderTextColor={colors.textSecondary}
+              returnKeyType="next"
+              onSubmitEditing={() => transactionIdRef.current?.focus()}
+              submitBehavior="submit"
             />
 
             <Text style={styles.label}>Transaction ID (optional)</Text>
             <TextInput
+              ref={transactionIdRef}
               style={styles.input}
               value={transactionId}
               onChangeText={setTransactionId}
               placeholder="e.g. pi_3OqX2KJH8example"
               placeholderTextColor={colors.textSecondary}
+              returnKeyType="next"
+              onSubmitEditing={() => proofUrlRef.current?.focus()}
+              submitBehavior="submit"
             />
 
             <Text style={styles.label}>Proof URL</Text>
             <TextInput
+              ref={proofUrlRef}
               style={styles.input}
               value={proofUrl}
               onChangeText={setProofUrl}
               placeholder="e.g. https://drive.google.com/..."
               placeholderTextColor={colors.textSecondary}
               autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleRecordDonation}
             />
 
             <TouchableOpacity
@@ -658,21 +679,31 @@ export default function AdminScreen() {
                     onChangeText={setEditAmount}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.textSecondary}
+                    returnKeyType="next"
+                    onSubmitEditing={() => editTransactionIdRef.current?.focus()}
+                    submitBehavior="submit"
                   />
                   <Text style={styles.label}>Transaction ID (optional)</Text>
                   <TextInput
+                    ref={editTransactionIdRef}
                     style={styles.input}
                     value={editTransactionId}
                     onChangeText={setEditTransactionId}
                     placeholderTextColor={colors.textSecondary}
+                    returnKeyType="next"
+                    onSubmitEditing={() => editProofUrlRef.current?.focus()}
+                    submitBehavior="submit"
                   />
                   <Text style={styles.label}>Proof URL</Text>
                   <TextInput
+                    ref={editProofUrlRef}
                     style={styles.input}
                     value={editProofUrl}
                     onChangeText={setEditProofUrl}
                     autoCapitalize="none"
                     placeholderTextColor={colors.textSecondary}
+                    returnKeyType="done"
+                    onSubmitEditing={handleEditDonation}
                   />
                   <View style={styles.rowButtons}>
                     <TouchableOpacity
@@ -812,10 +843,14 @@ export default function AdminScreen() {
               placeholder="e.g. food bank  or  12-3456789"
               placeholderTextColor={colors.textSecondary}
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => importStateRef.current?.focus()}
+              submitBehavior="submit"
             />
 
             <Text style={styles.label}>State (optional, 2-letter code)</Text>
             <TextInput
+              ref={importStateRef}
               style={styles.input}
               value={importState}
               onChangeText={setImportState}
@@ -823,25 +858,35 @@ export default function AdminScreen() {
               placeholderTextColor={colors.textSecondary}
               autoCapitalize="characters"
               maxLength={2}
+              returnKeyType="next"
+              onSubmitEditing={() => importCityRef.current?.focus()}
+              submitBehavior="submit"
             />
 
             <Text style={styles.label}>City (optional)</Text>
             <TextInput
+              ref={importCityRef}
               style={styles.input}
               value={importCity}
               onChangeText={setImportCity}
               placeholder="e.g. Los Angeles"
               placeholderTextColor={colors.textSecondary}
+              returnKeyType="next"
+              onSubmitEditing={() => importCountRef.current?.focus()}
+              submitBehavior="submit"
             />
 
             <Text style={styles.label}>Number to Import</Text>
             <TextInput
+              ref={importCountRef}
               style={styles.input}
               value={importCount}
               onChangeText={setImportCount}
               keyboardType="number-pad"
               placeholder="e.g. 10"
               placeholderTextColor={colors.textSecondary}
+              returnKeyType="done"
+              onSubmitEditing={handleImportCharities}
             />
 
             <TouchableOpacity
