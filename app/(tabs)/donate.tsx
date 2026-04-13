@@ -4,6 +4,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../contexts/authContext';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
 
 type VotingPeriod = { id: string; start_date: string; end_date: string };
@@ -17,6 +18,7 @@ export default function DonateScreen() {
   const [donating, setDonating] = useState(false);
 
   const { requireAuth, user } = useRequireAuth();
+  const { session } = useAuth();
 
   useEffect(() => {
     loadResults();
@@ -107,6 +109,7 @@ export default function DonateScreen() {
         // call Edge Function to create a PayPal order
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-order', {
           body: { amount: amount.toFixed(2), userId: user?.id },
+          headers: { Authorization: `Bearer ${session?.access_token}` },
         });
 
         console.log('Create PayPal Order Response:', { sessionData, sessionError });
@@ -144,6 +147,7 @@ export default function DonateScreen() {
         if (result.type === 'success') {
           const { data: captureData, error: captureError } = await supabase.functions.invoke('capture-paypal-order', {
             body: { orderId: sessionData.orderId, userId: user?.id, votingPeriodId: sessionData.votingPeriodId },
+            headers: { Authorization: `Bearer ${session?.access_token}` },
           });
 
           console.log('Capture PayPal Order Response:', { captureData, captureError });
