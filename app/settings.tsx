@@ -28,6 +28,7 @@ export default function SettingsScreen() {
   // Account info
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
+  const [userUsername, setUserUsername] = useState<string>('');
 
   // Notification toggles
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -43,12 +44,13 @@ export default function SettingsScreen() {
     setUserEmail(session.user.email ?? '');
     supabase
       .from('profiles')
-      .select('phone, email_notifications')
+      .select('phone, email_notifications, username')
       .eq('user_id', session.user.id)
       .single()
       .then(({ data }) => {
         setUserPhone(data?.phone ?? 'Not provided');
         setEmailNotifications(data?.email_notifications ?? true);
+        setUserUsername(data?.username ?? '');
       });
   }, [session]);
 
@@ -204,6 +206,11 @@ export default function SettingsScreen() {
         {/* ── Account ── */}
         <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>Account</Text>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Username</Text>
+            <Text style={styles.infoValue}>{userUsername ? `@${userUsername}` : '—'}</Text>
+          </View>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Email</Text>

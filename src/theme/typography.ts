@@ -20,7 +20,7 @@ export const typography = {
     medium: '500',
     semiBold: '600',
     bold: '700',
-  },
+  } as const,
   
   // Line heights (relative to font size)
   lineHeights: {

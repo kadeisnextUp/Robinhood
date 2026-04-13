@@ -1,19 +1,20 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!identifier || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -21,13 +22,31 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
+      const trimmed = identifier.trim();
+      let emailToUse = trimmed;
+
+      // If input has no @ it's a username — look up the associated email
+      if (!trimmed.includes('@')) {
+        const { data: lookedUpEmail, error: rpcError } = await supabase.rpc(
+          'get_email_by_username',
+          { p_username: trimmed.toLowerCase() }
+        );
+
+        if (rpcError || !lookedUpEmail) {
+          Alert.alert('Login Failed', 'Invalid username or password');
+          return;
+        }
+
+        emailToUse = lookedUpEmail;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: emailToUse,
         password,
       });
 
       if (error) {
-        Alert.alert('Login Failed', error.message);
+        Alert.alert('Login Failed', 'Invalid username or password');
       } else {
         router.replace('/(tabs)');
       }
@@ -53,21 +72,26 @@ export default function LoginScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Email or Username"
           placeholderTextColor={colors.grey}
-          value={email}
-          onChangeText={setEmail}
+          value={identifier}
+          onChangeText={setIdentifier}
           autoCapitalize="none"
-          keyboardType="email-address"
+          returnKeyType="next"
+          onSubmitEditing={() => passwordRef.current?.focus()}
+          submitBehavior="submit"
         />
 
         <TextInput
+          ref={passwordRef}
           style={styles.input}
           placeholder="Password"
           placeholderTextColor={colors.grey}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          returnKeyType="done"
+          onSubmitEditing={handleLogin}
         />
 
         <TouchableOpacity

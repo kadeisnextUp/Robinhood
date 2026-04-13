@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts/authContext';
 import { supabase } from '../services/supabase';
@@ -14,6 +14,8 @@ export default function ChangePasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const newPasswordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -21,8 +23,9 @@ export default function ChangePasswordScreen() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      Alert.alert('Error', 'Password must be at least 8 characters and include an uppercase letter, lowercase letter, and number');
       return;
     }
 
@@ -35,24 +38,18 @@ export default function ChangePasswordScreen() {
     setLoading(true);
 
     try {
-      // Verify the current password by re-authenticating
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: session.user.email,
-        password: currentPassword,
-      });
-
-      if (signInError) {
-        Alert.alert('Error', 'Current password is incorrect');
-        return;
-      }
-
-      // Update to the new password
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
+        current_password: currentPassword,
       });
 
       if (updateError) {
-        Alert.alert('Error', updateError.message);
+        const msg = updateError.message?.toLowerCase();
+        if (msg?.includes('current') || msg?.includes('password') || msg?.includes('invalid') || msg?.includes('credentials')) {
+          Alert.alert('Error', 'Current password is incorrect');
+        } else {
+          Alert.alert('Error', updateError.message);
+        }
         return;
       }
 
@@ -82,24 +79,34 @@ export default function ChangePasswordScreen() {
         value={currentPassword}
         onChangeText={setCurrentPassword}
         secureTextEntry
+        returnKeyType="next"
+        onSubmitEditing={() => newPasswordRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <TextInput
+        ref={newPasswordRef}
         style={styles.input}
-        placeholder="New Password (min 6 characters)"
+        placeholder="New Password (min 8 chars, upper, lower, number)"
         placeholderTextColor={colors.grey}
         value={newPassword}
         onChangeText={setNewPassword}
         secureTextEntry
+        returnKeyType="next"
+        onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+        submitBehavior="submit"
       />
 
       <TextInput
+        ref={confirmPasswordRef}
         style={styles.input}
         placeholder="Confirm New Password"
         placeholderTextColor={colors.grey}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
+        returnKeyType="done"
+        onSubmitEditing={handleChangePassword}
       />
 
       <TouchableOpacity

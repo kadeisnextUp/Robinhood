@@ -2,10 +2,14 @@ import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { HeaderTitle } from '@react-navigation/elements';
 import { Link, router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/authContext';
 import { supabase } from '../../services/supabase';
+import { isProfane } from '../../src/utils/profanity';
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
+const COOLDOWN_DAYS = 5;
 
 interface Nomination {
   id: string;
@@ -17,6 +21,8 @@ interface Nomination {
 
 interface Profile {
   isAdmin: boolean;
+  username: string;
+  usernameUpdatedAt: string | null;
   name: string;
   email: string;
   number: string;
@@ -32,6 +38,12 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // username editing
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const usernameInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (session) {
@@ -51,13 +63,17 @@ export default function ProfileScreen() {
       // get profile info
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('name, phone, avatar_url, is_admin')
+        .select('name, phone, avatar_url, is_admin, username, username_updated_at')
         .eq('user_id', userId)
         .single();
 
-      // if no profile row exists yet, create one
+      // if no profile row exists yet, create one with username from signup metadata
       if (profileError && profileError.code === 'PGRST116') {
-        await supabase.from('profiles').insert({ user_id: userId });
+        const metaUsername = session.user.user_metadata?.username as string | undefined;
+        await supabase.from('profiles').insert({
+          user_id: userId,
+          username: metaUsername ?? `user_${userId.slice(0, 8)}`,
+        });
       } else if (profileError) {
         throw profileError;
       }
@@ -111,6 +127,8 @@ export default function ProfileScreen() {
 
       setProfile({
         isAdmin: profileData?.is_admin ?? false,
+        username: profileData?.username || `user_${userId.slice(0, 8)}`,
+        usernameUpdatedAt: profileData?.username_updated_at ?? null,
         name: profileData?.name || 'User',
         email: session.user.email || '',
         number: profileData?.phone || 'Not provided',
@@ -145,6 +163,69 @@ export default function ProfileScreen() {
       setError('Unable to load profile data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUsernameUpdate = async () => {
+    if (!session || !profile) return;
+
+    const trimmed = newUsername.trim().toLowerCase();
+
+    // Cooldown check
+    if (profile.usernameUpdatedAt) {
+      const diffDays = (Date.now() - new Date(profile.usernameUpdatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays < COOLDOWN_DAYS) {
+        const daysLeft = Math.ceil(COOLDOWN_DAYS - diffDays);
+        Alert.alert('Cooldown', `You can change your username again in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`);
+        return;
+      }
+    }
+
+    if (!USERNAME_REGEX.test(trimmed)) {
+      Alert.alert('Error', 'Username must be 3–20 characters and can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
+
+    if (isProfane(trimmed)) {
+      Alert.alert('Error', 'That username is not allowed');
+      return;
+    }
+
+    if (trimmed === profile.username) {
+      setIsEditingUsername(false);
+      return;
+    }
+
+    setUsernameLoading(true);
+    try {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', trimmed)
+        .maybeSingle();
+
+      if (existing) {
+        Alert.alert('Error', 'That username is already taken');
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ username: trimmed, username_updated_at: now })
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        Alert.alert('Error', error.message);
+        return;
+      }
+
+      setProfile({ ...profile, username: trimmed, usernameUpdatedAt: now });
+      setIsEditingUsername(false);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not update username.');
+    } finally {
+      setUsernameLoading(false);
     }
   };
 
@@ -235,7 +316,43 @@ export default function ProfileScreen() {
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <Text style={styles.infolabel}>Username</Text>
-            <Text style={styles.infoValue}>{profile.name}</Text>
+            {isEditingUsername ? (
+              <View style={styles.usernameEditContainer}>
+                <TextInput
+                  ref={usernameInputRef}
+                  style={styles.usernameInput}
+                  value={newUsername}
+                  onChangeText={setNewUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleUsernameUpdate}
+                />
+                {usernameLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: spacing.sm }} />
+                ) : (
+                  <>
+                    <TouchableOpacity onPress={handleUsernameUpdate} style={styles.usernameAction}>
+                      <Ionicons name="checkmark" size={20} color={colors.success} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setIsEditingUsername(false)} style={styles.usernameAction}>
+                      <Ionicons name="close" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            ) : (
+              <View style={styles.usernameDisplayContainer}>
+                <Text style={styles.infoValue}>@{profile.username}</Text>
+                <TouchableOpacity
+                  onPress={() => { setNewUsername(profile.username); setIsEditingUsername(true); }}
+                  style={styles.usernameAction}
+                >
+                  <Ionicons name="pencil" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           <View style={styles.infoBorder} />
 
@@ -433,6 +550,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     marginLeft: 150,
+  },
+  usernameDisplayContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  usernameEditContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+  },
+  usernameInput: {
+    flex: 1,
+    fontSize: typography.sizes.md,
+    color: colors.text,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+    paddingVertical: spacing.xs,
+    textAlign: 'right',
+  },
+  usernameAction: {
+    padding: spacing.xs,
   },
   divider: {
     height: 1,

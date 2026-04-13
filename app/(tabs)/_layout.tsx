@@ -1,5 +1,5 @@
 import { colors, spacing } from '@/src/theme';
-import { AntDesign, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 
@@ -36,7 +36,7 @@ export default function TabLayout() {
         options={{
           title: 'Donate',
           tabBarIcon: ({ color, size }) => (
-            <AntDesign name="play-square" size={size} color={color} />
+            <MaterialIcons name="attach-money" size={size} color={color} />
           ),
         }}
       />
