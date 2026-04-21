@@ -79,11 +79,11 @@ Deno.serve(async (req) => {
 
     const now = new Date();
 
-    // Start: today at midnight UTC
+    // start: today at midnight UTC
     const start = new Date(now);
     start.setUTCHours(0, 0, 0, 0);
 
-    // End: the coming Sunday at 23:55 UTC (same day if today is Sunday)
+    // end: the coming Sunday at 23:55 UTC (same day if today is Sunday)
     const end = new Date(start);
     const daysUntilSunday = (7 - end.getUTCDay()) % 7 || 7;
     end.setUTCDate(end.getUTCDate() + daysUntilSunday);
@@ -113,6 +113,48 @@ Deno.serve(async (req) => {
       .insert(votingPeriodCharities);
 
     if (insertError) throw insertError;
+
+    const selectedIds = selected.map((c) => c.id);
+
+    const [{ data: allProfiles }, { data: nominatorRows }] = await Promise.all([
+      supabase.from('profiles').select('user_id, expo_push_token').not('expo_push_token', 'is', null),
+      supabase.from('nominations').select('user_id, charity_id, charities(name)').in('charity_id', selectedIds).eq('status', 'approved'),
+    ]);
+
+    const validProfiles = (allProfiles ?? []).filter((p: any) =>
+      p.expo_push_token?.startsWith('ExponentPushToken[')
+    );
+
+    const broadcastMsgs = validProfiles.map((p: any) => ({
+      to: p.expo_push_token,
+      title: 'New Vote Is Open!',
+      body: "This week's 5 charities are ready. Cast your vote now!",
+      data: { type: 'new_voting_period', voting_period_id: newPeriod.id },
+    }));
+
+    const profileTokenMap = new Map((allProfiles ?? []).map((p: any) => [p.user_id, p.expo_push_token]));
+    const nominatorMsgs = (nominatorRows ?? [])
+      .map((n: any) => {
+        const token = profileTokenMap.get(n.user_id);
+        if (!token?.startsWith('ExponentPushToken[')) return null;
+        const charityName = n.charities?.name ?? 'Your nominated charity';
+        return {
+          to: token,
+          title: "Your charity is in this week's vote!",
+          body: `${charityName} was selected for this week's voting round. Go vote!`,
+          data: { type: 'charity_selected', charity_id: n.charity_id, voting_period_id: newPeriod.id },
+        };
+      })
+      .filter(Boolean);
+
+    const allMsgs = [...broadcastMsgs, ...nominatorMsgs];
+    if (allMsgs.length > 0) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(allMsgs),
+      });
+    }
 
     return new Response(
       JSON.stringify({

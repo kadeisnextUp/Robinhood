@@ -1,5 +1,5 @@
 // supabase/functions/approve-charity/index.ts
-// Admin action: approves a nominated charity and notifies all nominators.
+// admin action: approves a nominated charity and notifies all nominators.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 Deno.serve(async (req) => {

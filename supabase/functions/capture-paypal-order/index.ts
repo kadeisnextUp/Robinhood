@@ -73,6 +73,26 @@ Deno.serve(async (req) => {
       throw new Error(insertError.message);
     }
 
+    // send donation confirmation to the user
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('expo_push_token')
+      .eq('user_id', userId)
+      .single();
+
+    if (userProfile?.expo_push_token?.startsWith('ExponentPushToken[')) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: userProfile.expo_push_token,
+          title: 'Donation Confirmed!',
+          body: `Your $${amount.toFixed(2)} donation has been received. Thank you!`,
+          data: { type: 'donation_confirmed', transaction_id: transactionId, amount },
+        }),
+      });
+    }
+
     return new Response(JSON.stringify({ success: true, transactionId, amount }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
