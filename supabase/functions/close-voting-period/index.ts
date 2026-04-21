@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
     let expiredPeriods;
     if (force && forcePeriodId) {
-      // Admin manually closing a specific period
+      // admin manually closing a specific period
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
       expiredPeriods = data;
     } else {
-      // Scheduled: close any period whose end_date has passed
+      // scheduled: close any period whose end_date has passed
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -75,6 +75,49 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
+      // fetch winner charity name and all profiles with tokens
+      const [{ data: winnerCharity }, { data: allProfiles }, { data: winnerVoters }] = await Promise.all([
+        supabase.from('charities').select('name').eq('id', winner.charity_id).single(),
+        supabase.from('profiles').select('user_id, expo_push_token').not('expo_push_token', 'is', null),
+        supabase.from('votes').select('user_id').eq('voting_period_id', period.id).eq('charity_id', winner.charity_id),
+      ]);
+
+      const winnerVoterIds = new Set((winnerVoters ?? []).map((v: any) => v.user_id));
+      const charityName = winnerCharity?.name ?? 'A charity';
+      const notifData = { type: 'winner_announced', period_id: period.id, winner_charity_id: winner.charity_id };
+
+      const pickedTokens: string[] = [];
+      const broadcastTokens: string[] = [];
+      for (const p of (allProfiles ?? [])) {
+        const token = p.expo_push_token;
+        if (!token?.startsWith('ExponentPushToken[')) continue;
+        if (winnerVoterIds.has(p.user_id)) pickedTokens.push(token);
+        else broadcastTokens.push(token);
+      }
+
+      const pushMessages = [
+        ...pickedTokens.map((token: string) => ({
+          to: token,
+          title: 'Your pick won!',
+          body: `${charityName} won this week's vote. Great call!`,
+          data: notifData,
+        })),
+        ...broadcastTokens.map((token: string) => ({
+          to: token,
+          title: 'Winner Announced!',
+          body: `${charityName} won this week's vote!`,
+          data: notifData,
+        })),
+      ];
+
+      if (pushMessages.length > 0) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(pushMessages),
+        });
+      }
+
       results.push({
         period_id: period.id,
         winner_charity_id: winner.charity_id,
@@ -82,8 +125,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // When running on schedule (not admin force-close), automatically create next week's period.
-    // The new period starts next Monday 00:00 UTC so the 5-minute dead phase (Sun 23:55–Mon 00:00) is preserved.
+    // when running on schedule (not admin force-close), automatically create next week's period.
+    // the new period starts next Monday 00:00 UTC so the 5-minute dead phase (Sun 23:55–Mon 00:00) is preserved.
     let nextPeriodId: string | null = null;
     if (!force) {
       const { data: existing } = await supabase
@@ -93,19 +136,19 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
-        // Calculate next Monday midnight UTC
+        // calculate next Monday midnight UTC
         const nextStart = new Date();
         const dayOfWeek = nextStart.getUTCDay(); // 0 = Sunday
         const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
         nextStart.setUTCDate(nextStart.getUTCDate() + daysToMonday);
         nextStart.setUTCHours(0, 0, 0, 0);
 
-        // End: following Sunday 23:55 UTC
+        // end: following Sunday 23:55 UTC
         const nextEnd = new Date(nextStart);
         nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
         nextEnd.setUTCHours(23, 55, 0, 0);
 
-        // Exclude charities from the last 3 periods
+        // exclude charities from the last 3 periods
         const { data: recentPeriods } = await supabase
           .from('voting_periods')
           .select('id')
@@ -142,10 +185,53 @@ Deno.serve(async (req) => {
             .single();
 
           if (!periodError && newPeriod) {
+            const selectedIds = selected.map((c) => c.id);
             await supabase.from('voting_period_charities').insert(
-              selected.map((c) => ({ voting_period_id: newPeriod.id, charity_id: c.id }))
+              selectedIds.map((id) => ({ voting_period_id: newPeriod.id, charity_id: id }))
             );
             nextPeriodId = newPeriod.id;
+
+            const [{ data: newPeriodProfiles }, { data: nominatorRows }] = await Promise.all([
+              supabase.from('profiles').select('user_id, expo_push_token').not('expo_push_token', 'is', null),
+              supabase.from('nominations').select('user_id, charity_id, charities(name)').in('charity_id', selectedIds).eq('status', 'approved'),
+            ]);
+
+            const validProfiles = (newPeriodProfiles ?? []).filter((p: any) =>
+              p.expo_push_token?.startsWith('ExponentPushToken[')
+            );
+
+            // broadcast new period to all users
+            const broadcastMsgs = validProfiles.map((p: any) => ({
+              to: p.expo_push_token,
+              title: 'New Vote Is Open!',
+              body: "This week's 5 charities are ready. Cast your vote now!",
+              data: { type: 'new_voting_period', voting_period_id: newPeriod.id },
+            }));
+
+            // personalized message to nominators whose charity was selected
+            const profileTokenMap = new Map((newPeriodProfiles ?? []).map((p: any) => [p.user_id, p.expo_push_token]));
+            const nominatorMsgs = (nominatorRows ?? [])
+              .map((n: any) => {
+                const token = profileTokenMap.get(n.user_id);
+                if (!token?.startsWith('ExponentPushToken[')) return null;
+                const charityName = n.charities?.name ?? 'Your nominated charity';
+                return {
+                  to: token,
+                  title: "Your charity is in this week's vote!",
+                  body: `${charityName} was selected for this week's voting round. Go vote!`,
+                  data: { type: 'charity_selected', charity_id: n.charity_id, voting_period_id: newPeriod.id },
+                };
+              })
+              .filter(Boolean);
+
+            const allNewPeriodMsgs = [...broadcastMsgs, ...nominatorMsgs];
+            if (allNewPeriodMsgs.length > 0) {
+              await fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify(allNewPeriodMsgs),
+              });
+            }
           }
         }
       }
