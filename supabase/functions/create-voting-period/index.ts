@@ -77,15 +77,17 @@ Deno.serve(async (req) => {
 
     
 
-    // admin forces the new voting period
     const now = new Date();
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
 
-    // create the new voting period which will start in the dead period
+    // Start: today at midnight UTC
+    const start = new Date(now);
+    start.setUTCHours(0, 0, 0, 0);
+
+    // End: the coming Sunday at 23:55 UTC (same day if today is Sunday)
     const end = new Date(start);
-    end.setDate(end.getDate() + 6);  
-    end.setHours(23, 55, 0, 0);   
+    const daysUntilSunday = (7 - end.getUTCDay()) % 7 || 7;
+    end.setUTCDate(end.getUTCDate() + daysUntilSunday);
+    end.setUTCHours(23, 55, 0, 0);
 
 
     const { data: newPeriod, error: periodError } = await supabase

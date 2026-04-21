@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   Linking,
   ScrollView,
   StyleSheet,
@@ -53,6 +54,7 @@ export default function HomeScreen() {
         .from('voting_periods')
         .select('id')
         .eq('is_closed', false)
+        .lte('start_date', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -100,6 +102,7 @@ export default function HomeScreen() {
         .from('voting_periods')
         .select('id')
         .eq('is_closed', false)
+        .lte('start_date', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -120,6 +123,7 @@ export default function HomeScreen() {
   }
 
   const handleSearch = async () => {
+    Keyboard.dismiss();
     const query = searchQuery.trim();
     if (query.length < 2) {
       Alert.alert('Search', 'Please enter at least 2 characters.');
@@ -294,7 +298,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.charityList}>
+      <ScrollView style={styles.charityList} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {/* search Results */}
         {searchResults !== null && (
           <View style={styles.resultsContainer}>
