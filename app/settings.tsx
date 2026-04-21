@@ -50,7 +50,7 @@ export default function SettingsScreen() {
       .then(({ data }) => {
         setUserPhone(data?.phone ?? 'Not provided');
         setEmailNotifications(data?.email_notifications ?? true);
-        setUserUsername(data?.username ?? '');
+        setUserUsername(data?.username ?? session.user.user_metadata?.username ?? '');
       });
   }, [session]);
 
@@ -296,13 +296,23 @@ export default function SettingsScreen() {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Contact Us</Text>
-            <Text style={styles.infoValue}>support@fund-it.app</Text>
+            <Text style={styles.infoValue}>funditsupport@gmail.com</Text>
           </View>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>FAQ</Text>
             <Text style={styles.infoValue}>www.fund-it.app/faq</Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.infoRow}
+            onPress={() => Linking.openURL(
+              `mailto:funditsupport@gmail.com?subject=${encodeURIComponent('Fund-It Bug Report')}&body=${encodeURIComponent('Describe the issue:\n\nSteps to reproduce:\n\nWhat screen were you on:\n\nDevice/OS:\n')}`
+            )}
+          >
+            <Text style={styles.infoLabel}>Report a Bug</Text>
+            <Ionicons name="bug-outline" size={18} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Legal ── */}

@@ -25,8 +25,13 @@ export default function SignupScreen() {
       return;
     }
 
+    if (username.includes(' ')) {
+      Alert.alert('Invalid Username', 'Username cannot contain spaces. Use letters, numbers, underscores (_), or hyphens (-) only.');
+      return;
+    }
+
     if (!USERNAME_REGEX.test(username)) {
-      Alert.alert('Error', 'Username must be 3–20 characters and can only contain letters, numbers, underscores, and hyphens');
+      Alert.alert('Invalid Username', 'Username must be 3–20 characters and can only contain letters, numbers, underscores (_), and hyphens (-)');
       return;
     }
 
