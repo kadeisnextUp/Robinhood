@@ -11,6 +11,7 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 - **Weekly Charity Voting**: Vote for 1 of 5 featured charities each week
 - **Direct Donations**: Option to donate from your own pocket
 - **Community Curation**: 2 of 5 weekly charities come from user suggestions with upvoting
+- **Community Nominations**: Users can nominate charities to be added to the DB. Has to be approved/denied by a admin
 - **Transparent Donations**: Public history of all donations with proof/receipts
 - **Fair Rotation**: Charities can only win twice per year with cooldown periods
 
@@ -30,7 +31,7 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 ### Target Platforms
 - iOS (App Store)
 - Android (Google Play Store)
-- webiste
+- webiste (fund-it.app)
 
 
 
@@ -54,7 +55,7 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 - [x] Vote tracking and results
 
 ### Month 4: Payments & Advanced Features
-- [ ] Paypal integration for donations
+- [x] Paypal integration for donations
 - [x] Charity suggestion system
 - [x] Upvoting mechanism
 - [x] Admin tools for weekly management
