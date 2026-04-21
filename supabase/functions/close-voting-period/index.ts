@@ -7,14 +7,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const body = await req.json();
+    let body: any = {};
+    try { body = await req.json(); } catch { /* no body is fine for scheduled calls */ }
+
     const force = body?.force ?? false;
     const forcePeriodId = body?.period_id ?? null;
     const now = new Date().toISOString();
 
     let expiredPeriods;
-    // force close through admin page 
     if (force && forcePeriodId) {
+      // Admin manually closing a specific period
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -23,7 +25,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
       expiredPeriods = data;
     } else {
-      // normal close 
+      // Scheduled: close any period whose end_date has passed
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -58,10 +60,7 @@ Deno.serve(async (req) => {
             .eq('voting_period_id', period.id)
             .eq('charity_id', item.charity_id);
 
-          return {
-            charity_id: item.charity_id,
-            votes: count ?? 0,
-          };
+          return { charity_id: item.charity_id, votes: count ?? 0 };
         })
       );
 
@@ -71,10 +70,7 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await supabase
         .from('voting_periods')
-        .update({
-          is_closed: true,
-          winner_charity_id: winner.charity_id,
-        })
+        .update({ is_closed: true, winner_charity_id: winner.charity_id })
         .eq('id', period.id);
 
       if (updateError) throw updateError;
@@ -86,11 +82,81 @@ Deno.serve(async (req) => {
       });
     }
 
+    // When running on schedule (not admin force-close), automatically create next week's period.
+    // The new period starts next Monday 00:00 UTC so the 5-minute dead phase (Sun 23:55–Mon 00:00) is preserved.
+    let nextPeriodId: string | null = null;
+    if (!force) {
+      const { data: existing } = await supabase
+        .from('voting_periods')
+        .select('id')
+        .eq('is_closed', false)
+        .maybeSingle();
+
+      if (!existing) {
+        // Calculate next Monday midnight UTC
+        const nextStart = new Date();
+        const dayOfWeek = nextStart.getUTCDay(); // 0 = Sunday
+        const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+        nextStart.setUTCDate(nextStart.getUTCDate() + daysToMonday);
+        nextStart.setUTCHours(0, 0, 0, 0);
+
+        // End: following Sunday 23:55 UTC
+        const nextEnd = new Date(nextStart);
+        nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
+        nextEnd.setUTCHours(23, 55, 0, 0);
+
+        // Exclude charities from the last 3 periods
+        const { data: recentPeriods } = await supabase
+          .from('voting_periods')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        let excludedIds: string[] = [];
+        if (recentPeriods && recentPeriods.length > 0) {
+          const { data: recentCharities } = await supabase
+            .from('voting_period_charities')
+            .select('charity_id')
+            .in('voting_period_id', recentPeriods.map((p) => p.id));
+          excludedIds = recentCharities?.map((c) => c.charity_id) ?? [];
+        }
+
+        let charityQuery = supabase.from('charities').select('id').eq('is_approved', true);
+        if (excludedIds.length > 0) {
+          charityQuery = charityQuery.not('id', 'in', `(${excludedIds.join(',')})`);
+        }
+
+        const { data: eligible } = await charityQuery;
+
+        if (eligible && eligible.length >= 5) {
+          const selected = eligible.sort(() => Math.random() - 0.5).slice(0, 5);
+
+          const { data: newPeriod, error: periodError } = await supabase
+            .from('voting_periods')
+            .insert({
+              start_date: nextStart.toISOString(),
+              end_date: nextEnd.toISOString(),
+              is_closed: false,
+            })
+            .select()
+            .single();
+
+          if (!periodError && newPeriod) {
+            await supabase.from('voting_period_charities').insert(
+              selected.map((c) => ({ voting_period_id: newPeriod.id, charity_id: c.id }))
+            );
+            nextPeriodId = newPeriod.id;
+          }
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         periods_closed: results.length,
         results,
+        ...(nextPeriodId ? { next_period_id: nextPeriodId } : {}),
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
