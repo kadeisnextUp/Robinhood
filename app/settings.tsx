@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { Link, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -16,27 +16,23 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { useAuth } from "../contexts/authContext";
-import { supabase } from "../services/supabase";
-import { colors, spacing, typography } from "../src/theme";
+} from 'react-native';
+import { useAuth } from '../contexts/authContext';
+import { supabase } from '../services/supabase';
+import { borderRadius, colors, spacing, typography } from '../src/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
 
-  // Account info
   const [userEmail, setUserEmail] = useState<string>('');
-  const [userPhone, setUserPhone] = useState<string>('');
   const [userUsername, setUserUsername] = useState<string>('');
 
-  // Notification toggles
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifLoadingRef = useRef(false);
 
-  // Delete account modal
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   useEffect(() => {
@@ -48,14 +44,11 @@ export default function SettingsScreen() {
       .eq('user_id', session.user.id)
       .single()
       .then(({ data }) => {
-        setUserPhone(data?.phone ?? 'Not provided');
         setEmailNotifications(data?.email_notifications ?? true);
         setUserUsername(data?.username ?? session.user.user_metadata?.username ?? '');
       });
   }, [session]);
 
-  // Check OS permission on mount and whenever the app returns to the foreground
-  // (e.g. after the user comes back from system Settings).
   useEffect(() => {
     const checkPermission = async () => {
       const { status } = await Notifications.getPermissionsAsync();
@@ -137,8 +130,6 @@ export default function SettingsScreen() {
 
       setPushNotifications(true);
     } else {
-      // Clear the DB token immediately so no more notifications are sent,
-      // then send the user to Settings to revoke the OS permission.
       await supabase
         .from('profiles')
         .update({ expo_push_token: null })
@@ -159,208 +150,186 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: async () => {
-            // TODO: clear auth token / session and redirect to login
-            await supabase.auth.signOut();
-            router.back();
-          },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut();
+          router.back();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeleteAccount = async () => {
-    // TODO: call delete account API, then sign out and redirect
     await supabase.auth.signOut();
     setDeleteModalVisible(false);
     router.back();
   };
 
-  const handleChangePassword = () => {
-    router.push('/change-password');
-  };
-
   return (
     <View style={styles.container}>
-      <Text style={styles.HeaderTitle}>Settings</Text>
-      <Link
-        href="/profile"
-        asChild
-        style={{ position: "absolute", top: spacing.xl + spacing.xl, left: spacing.lg }}
+
+      {/* ── header ── */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.headerRight} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.backButtonText}>
-          <Ionicons name="arrow-back" size={32} color={colors.primary} />
-        </Text>
-      </Link>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-
-        {/* ── Account ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Account</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Username</Text>
-            <Text style={styles.infoValue}>{userUsername ? `@${userUsername}` : '—'}</Text>
+        {/* ── profile mini card ── */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileAvatar}>
+            <Ionicons name="person" size={28} color={colors.white} />
           </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>{userEmail || '—'}</Text>
+          <View style={styles.profileCardText}>
+            <Text style={styles.profileCardName}>{userUsername ? `@${userUsername}` : 'Your Account'}</Text>
+            <Text style={styles.profileCardEmail} numberOfLines={1}>{userEmail || '—'}</Text>
           </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Phone Number</Text>
-            <Text style={styles.infoValue}>{userPhone || '—'}</Text>
-          </View>
-
-          <TouchableOpacity style={styles.infoRow} onPress={handleChangePassword}>
-            <Text style={styles.infoLabel}>Change Password</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={18} color={colors.primaryLight} />
         </View>
 
-        {/* ── Notifications ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Notifications</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email Notifications</Text>
-            <Switch
-              value={emailNotifications}
-              onValueChange={handleEmailNotificationsToggle}
-              trackColor={{ false: colors.error, true: colors.success }}
-              thumbColor={colors.white}
-            />
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Push Notifications</Text>
-            <Switch
-              value={pushNotifications}
-              onValueChange={handlePushNotificationsToggle}
-              disabled={notifLoading}
-              trackColor={{ false: colors.error, true: colors.success }}
-              thumbColor={colors.white}
-            />
-          </View>
+        {/* ── account ── */}
+        <Text style={styles.sectionLabel}>Account</Text>
+        <View style={styles.card}>
+          <SettingsRow icon="person-outline" label="Username" value={userUsername ? `@${userUsername}` : '—'} />
+          <SettingsRow icon="mail-outline" label="Email" value={userEmail || '—'} last />
+          <SettingsRow
+            icon="lock-closed-outline"
+            label="Change Password"
+            onPress={() => router.push('/change-password')}
+            showChevron
+            last
+          />
         </View>
 
-        {/* ── Voting & Transparency ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Voting & Transparency</Text>
-
-          <TouchableOpacity
-            style={styles.infoRow}
-            onPress={() => router.push("/")}
-          >
-            <Text style={styles.infoLabel}>This Week's Charities</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.infoRow}
-            onPress={() => router.push("/(tabs)/receipts")}
-          >
-            <Text style={styles.infoLabel}>Donation Proof History</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </TouchableOpacity>
+        {/* ── notifications ── */}
+        <Text style={styles.sectionLabel}>Notifications</Text>
+        <View style={styles.card}>
+          <SettingsRow
+            icon="mail-unread-outline"
+            label="Email Notifications"
+            last={false}
+            toggle={
+              <Switch
+                value={emailNotifications}
+                onValueChange={handleEmailNotificationsToggle}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            }
+          />
+          <SettingsRow
+            icon="notifications-outline"
+            label="Push Notifications"
+            last
+            toggle={
+              <Switch
+                value={pushNotifications}
+                onValueChange={handlePushNotificationsToggle}
+                disabled={notifLoading}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            }
+          />
         </View>
 
-        {/* ── Security ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Security</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Two-Factor Authentication</Text>
-            <Text style={styles.infoValue}>Enabled</Text>
+        {/* ── tax Documents ── */}
+        <Text style={styles.sectionLabel}>Tax Documents</Text>
+        <View style={styles.card}>
+          <View style={styles.comingSoonBanner}>
+            <Ionicons name="document-text-outline" size={20} color={colors.primaryLight} />
+            <Text style={styles.comingSoonText}>Coming soon — generate tax documents based on your donation history.</Text>
           </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Login Alerts</Text>
-            <Text style={styles.infoValue}>Enabled</Text>
-          </View>
+          <SettingsRow icon="newspaper-outline" label="Annual Donation Summary" value="Coming Soon" last />
         </View>
 
-        {/* ── Support ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Support</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Contact Us</Text>
-            <Text style={styles.infoValue}>funditsupport@gmail.com</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>FAQ</Text>
-            <Text style={styles.infoValue}>www.fund-it.app/faq</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.infoRow}
-            onPress={() => Linking.openURL(
-              `mailto:funditsupport@gmail.com?subject=${encodeURIComponent('Fund-It Bug Report')}&body=${encodeURIComponent('Describe the issue:\n\nSteps to reproduce:\n\nWhat screen were you on:\n\nDevice/OS:\n')}`
-            )}
-          >
-            <Text style={styles.infoLabel}>Report a Bug</Text>
-            <Ionicons name="bug-outline" size={18} color={colors.primary} />
-          </TouchableOpacity>
+        {/* ── voting & Transparency ── */}
+        <Text style={styles.sectionLabel}>Voting & Transparency</Text>
+        <View style={styles.card}>
+          <SettingsRow
+            icon="heart-outline"
+            label="This Week's Charities"
+            onPress={() => router.push('/')}
+            showChevron
+          />
+          <SettingsRow
+            icon="receipt-outline"
+            label="Donation Proof History"
+            onPress={() => router.push('/(tabs)/receipts')}
+            showChevron
+            last
+          />
         </View>
 
-        {/* ── Legal ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Legal</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Terms of Service</Text>
-            <Text style={styles.infoValue}>www.fund-it.app/terms</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Privacy Policy</Text>
-            <Text style={styles.infoValue}>www.fund-it.app/privacy</Text>
-          </View>
+        {/* ── security ── */}
+        <Text style={styles.sectionLabel}>Security</Text>
+        <View style={styles.card}>
+          <SettingsRow icon="shield-checkmark-outline" label="Two-Factor Authentication" value="Coming Soon" />
+          <SettingsRow icon="alert-circle-outline" label="Login Alerts" value="Coming Soon" last />
         </View>
 
-        {/* ── About ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>About</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Version</Text>
-            <Text style={styles.infoValue}>1.0.0</Text>
-          </View>
+        {/* ── support ── */}
+        <Text style={styles.sectionLabel}>Support</Text>
+        <View style={styles.card}>
+          <SettingsRow icon="chatbubble-outline" label="Contact Us" value="funditsupport@gmail.com" />
+          <SettingsRow icon="help-circle-outline" label="FAQ" value="fund-it.app/faq" />
+          <SettingsRow
+            icon="bug-outline"
+            label="Report a Bug"
+            onPress={() =>
+              Linking.openURL(
+                `mailto:funditsupport@gmail.com?subject=${encodeURIComponent('Fund-It Bug Report')}&body=${encodeURIComponent('Describe the issue:\n\nSteps to reproduce:\n\nWhat screen were you on:\n\nDevice/OS:\n')}`
+              )
+            }
+            showChevron
+            last
+          />
         </View>
 
-        {/* ── Account Management ── */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Account Management</Text>
+        {/* ── legal ── */}
+        <Text style={styles.sectionLabel}>Legal</Text>
+        <View style={styles.card}>
+          <SettingsRow icon="document-text-outline" label="Terms of Service" value="Coming Soon" />
+          <SettingsRow icon="eye-outline" label="Privacy Policy" value="Coming Soon" last />
+        </View>
 
-          {/* Sign Out */}
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        {/* ── about ── */}
+        <Text style={styles.sectionLabel}>About</Text>
+        <View style={styles.card}>
+          <SettingsRow icon="information-circle-outline" label="Version" value="1.0.0" last />
+        </View>
+
+        {/* ── account Management ── */}
+        <View style={styles.dangerSection}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} activeOpacity={0.8}>
+            <Ionicons name="log-out-outline" size={18} color={colors.primary} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
 
-          {/* Delete Account */}
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => setDeleteModalVisible(true)}
+            activeOpacity={0.8}
           >
+            <Ionicons name="trash-outline" size={18} color={colors.white} />
             <Text style={styles.deleteButtonText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
 
       </ScrollView>
 
-      {/* ── Delete Account Confirmation Modal ── */}
+      {/* ── delete Account Modal ── */}
       <Modal
         transparent
         animationType="fade"
@@ -369,22 +338,19 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning-outline" size={28} color={colors.error} />
+            </View>
             <Text style={styles.modalTitle}>Delete Account</Text>
             <Text style={styles.modalMessage}>
-              This will permanently delete your account and all associated data.
-              This action cannot be undone.
+              This will permanently delete your account and all associated data. This action cannot
+              be undone.
             </Text>
             <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalCancel}
-                onPress={() => setDeleteModalVisible(false)}
-              >
+              <Pressable style={styles.modalCancel} onPress={() => setDeleteModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
-              <Pressable
-                style={styles.modalConfirm}
-                onPress={handleDeleteAccount}
-              >
+              <Pressable style={styles.modalConfirm} onPress={handleDeleteAccount}>
                 <Text style={styles.modalConfirmText}>Delete</Text>
               </Pressable>
             </View>
@@ -395,100 +361,245 @@ export default function SettingsScreen() {
   );
 }
 
+
+interface SettingsRowProps {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  showChevron?: boolean;
+  toggle?: React.ReactNode;
+  last?: boolean;
+}
+
+function SettingsRow({ icon, label, value, onPress, showChevron, toggle, last }: SettingsRowProps) {
+  const Wrapper = onPress ? TouchableOpacity : View;
+  return (
+    <Wrapper
+      style={[styles.row, !last && styles.rowBorder]}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
+      <View style={styles.rowLeft}>
+        <View style={styles.rowIconWrap}>
+          <Ionicons name={icon} size={18} color={colors.primary} />
+        </View>
+        <Text style={styles.rowLabel}>{label}</Text>
+      </View>
+      <View style={styles.rowRight}>
+        {toggle ?? (
+          <>
+            {value && (
+              <Text style={styles.rowValue} numberOfLines={1}>
+                {value}
+              </Text>
+            )}
+            {showChevron && (
+              <Ionicons name="chevron-forward" size={16} color={colors.primaryLight} />
+            )}
+          </>
+        )}
+      </View>
+    </Wrapper>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    paddingTop: spacing.xl,
+    backgroundColor: '#F5F0EB',
   },
-  HeaderTitle: {
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold,
-    color: colors.text,
-    backgroundColor: colors.background,
-    textAlign: "center",
-    paddingTop: spacing.xl,
-  },
-  backButtonText: {
-    fontSize: typography.sizes.md,
-    color: colors.primary,
-  },
-  scrollContent: {
+
+  
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? spacing.xxl + spacing.md : spacing.xl,
+    paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    backgroundColor: '#F5F0EB',
   },
-  infoSection: {
-    marginBottom: spacing.xxl,
+  backBtn: {
+    padding: spacing.xs,
+    width: 36,
+    alignItems: 'center',
   },
-  infoTitle: {
+  headerTitle: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold,
     color: colors.text,
-    textAlign: "left",
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
   },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  infoLabel: {
-    fontSize: typography.sizes.md,
-    color: colors.text,
-  },
-  infoValue: {
-    fontSize: typography.sizes.md,
-    color: colors.text,
+  headerRight: {
+    width: 36,
   },
 
-  // Sign Out
-  signOutButton: {
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  profileCardText: {
+    flex: 1,
+  },
+  profileCardName: {
+    fontSize: typography.sizes.body,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  profileCardEmail: {
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    marginTop: 2,
+  },
+
+  sectionLabel: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semiBold,
+    color: colors.grey,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm,
     marginTop: spacing.md,
+    marginLeft: spacing.xs,
+  },
+
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: spacing.md,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    minHeight: 52,
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.sm,
+  },
+  rowIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.md,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowLabel: {
+    fontSize: typography.sizes.body,
+    color: colors.text,
+    fontWeight: typography.weights.medium,
+    flex: 1,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    maxWidth: '45%',
+  },
+  rowValue: {
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+
+  dangerSection: {
+    marginTop: spacing.xl,
+    gap: spacing.sm,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    alignItems: "center",
-    marginBottom: spacing.sm,
+    backgroundColor: colors.white,
   },
   signOutText: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.body,
     fontWeight: typography.weights.bold,
     color: colors.primary,
   },
-
-  // Delete Account
   deleteButton: {
-    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.md,
-    borderRadius: 8,
-    backgroundColor: "#D9534F",
-    alignItems: "center",
+    borderRadius: borderRadius.xl,
+    backgroundColor: colors.error,
   },
   deleteButtonText: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.body,
     fontWeight: typography.weights.bold,
-    color: "#fff",
+    color: colors.white,
   },
 
-  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
   },
   modalCard: {
-    width: "100%",
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
+    width: '100%',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.xl,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${colors.error}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   modalTitle: {
     fontSize: typography.sizes.lg,
@@ -497,36 +608,55 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   modalMessage: {
-    fontSize: typography.sizes.md,
-    color: colors.text,
+    fontSize: typography.sizes.body,
+    color: colors.grey,
+    textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 22,
   },
   modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
+    flexDirection: 'row',
     gap: spacing.md,
+    width: '100%',
   },
   modalCancel: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
   },
   modalCancelText: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.body,
     color: colors.text,
+    fontWeight: typography.weights.medium,
   },
   modalConfirm: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 8,
-    backgroundColor: "#D9534F",
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+  },
+  comingSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: `${colors.primary}0D`,
+    borderRadius: borderRadius.lg,
+    margin: spacing.md,
+    padding: spacing.md,
+  },
+  comingSoonText: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    lineHeight: 18,
   },
   modalConfirmText: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.body,
     fontWeight: typography.weights.bold,
-    color: "#fff",
+    color: colors.white,
   },
 });
