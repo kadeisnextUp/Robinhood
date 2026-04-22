@@ -12,7 +12,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sawyerkd.appFundIt",
       "appleTeamId": "TMA6X93UYH",
-      "xcodeProjectName": "FundIt",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
