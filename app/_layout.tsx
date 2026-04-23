@@ -1,9 +1,20 @@
+import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../contexts/authContext';
+import { useEffect } from 'react';
+import { AuthProvider, useAuth } from '../contexts/authContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+
+SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
   usePushNotifications();
+  const { loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading) {
+      SplashScreen.hideAsync();
+    }
+  }, [loading]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
