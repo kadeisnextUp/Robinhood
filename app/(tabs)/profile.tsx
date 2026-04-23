@@ -1,5 +1,6 @@
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { Link, router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -7,6 +8,7 @@ import {
   Alert,
   Image,
   Platform,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -56,18 +58,28 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProfileData();
+    setRefreshing(false);
+  };
+
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [usernameLoading, setUsernameLoading] = useState(false);
   const usernameInputRef = useRef<TextInput>(null);
 
+  const isFocused = useIsFocused();
+
   useEffect(() => {
-    if (session) {
+    if (isFocused && session) {
       fetchProfileData();
-    } else {
+    } else if (!session) {
       setLoading(false);
     }
-  }, [session]);
+  }, [isFocused, session]);
 
   const fetchProfileData = async () => {
     try {
@@ -301,6 +313,9 @@ export default function ProfileScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
       >
         {/* ── username ── */}
         <View style={styles.identitySection}>
