@@ -453,7 +453,7 @@ const AVATAR_OVERLAP = AVATAR_SIZE / 2;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.background,
   },
   centerContent: {
     justifyContent: 'center',

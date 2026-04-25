@@ -1,52 +1,74 @@
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-export default function CurrentResultsScreen() {  
-  // component states
-  const [results, setResults] = useState([]);
+
+const CARD_BG = '#170F05';
+const CARD_BORDER_DIM = '#2A1E0E';
+
+export default function CurrentResultsScreen() {
+  const [results, setResults] = useState<{ id: string; name: string; votes: number }[]>([]);
   const [votingPeriod, setVotingPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState('');
+  const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, ended: false });
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.02, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.6, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     loadResults();
   }, []);
 
-  // calculate time remaining until Sunday 11:55 PM
   useEffect(() => {
     const calculateTimeRemaining = () => {
-      if (!votingPeriod || !votingPeriod.end_date) return;
-      
+      if (!votingPeriod?.end_date) return;
       const now = new Date();
       const end = new Date(votingPeriod.end_date);
-      const diff = end - now;
-      
+      const diff = end.getTime() - now.getTime();
+
       if (diff <= 0) {
-        setTimeRemaining('Voting ended');
+        setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0, ended: true });
         return;
       }
-      
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      if (days > 0) {
-        setTimeRemaining(`${days}d ${hours}h ${minutes}m remaining`);
-      } else if (hours > 0) {
-        setTimeRemaining(`${hours}h ${minutes}m ${seconds}s remaining`);
-      } else {
-        setTimeRemaining(`${minutes}m ${seconds}s remaining`);
-      }
+
+      setTimeRemaining({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000),
+        ended: false,
+      });
     };
-    
+
     calculateTimeRemaining();
     const interval = setInterval(calculateTimeRemaining, 1000);
-    
     return () => clearInterval(interval);
   }, [votingPeriod]);
 
@@ -55,7 +77,6 @@ export default function CurrentResultsScreen() {
       setLoading(true);
       setError(null);
 
-      // get the current open voting period
       const { data: period, error: periodError } = await supabase
         .from('voting_periods')
         .select('id, start_date, end_date')
@@ -65,24 +86,15 @@ export default function CurrentResultsScreen() {
         .single();
 
       if (periodError) throw periodError;
-
       setVotingPeriod(period);
 
-      // get the 5 charities for this voting period
       const { data: periodCharities, error: charitiesError } = await supabase
         .from('voting_period_charities')
-        .select(`
-          charity_id,
-          charities (
-            id,
-            name
-          )
-        `)
+        .select(`charity_id, charities (id, name)`)
         .eq('voting_period_id', period.id);
 
       if (charitiesError) throw charitiesError;
 
-      // get the vote count for each charity in this period
       const charitiesWithVotes = await Promise.all(
         periodCharities.map(async (item) => {
           const { count } = await supabase
@@ -100,7 +112,6 @@ export default function CurrentResultsScreen() {
       );
 
       setResults(charitiesWithVotes);
-
     } catch (err) {
       setError('Failed to load results. Please try again.');
       console.error('Error loading results:', err);
@@ -115,35 +126,27 @@ export default function CurrentResultsScreen() {
     setRefreshing(false);
   };
 
-  // format voting period dates for display
-  const formatVotingPeriod = () => {
-    if (!votingPeriod) return '';
-    const start = new Date(votingPeriod.start_date);
-    const end = new Date(votingPeriod.end_date);
-    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `Week of ${startStr} - ${endStr}`;
-  };
-
-  // sort results by votes highest first
   const sortedResults = [...results].sort((a, b) => b.votes - a.votes);
+  const totalVotes = sortedResults.reduce((sum, c) => sum + c.votes, 0);
+  const getPercentage = (votes) => (totalVotes > 0 ? (votes / totalVotes) * 100 : 0);
 
-  // calculate total votes for percentage bars
-  const totalVotes = sortedResults.reduce((sum, charity) => sum + charity.votes, 0);
-  const getPercentage = (votes) => totalVotes > 0 ? (votes / totalVotes) * 100 : 0;
-
-  // podium colors for top 3
-  const getPodiumColor = (index) => {
+  const getRankColor = (index) => {
     switch (index) {
       case 0: return colors.gold;
       case 1: return colors.silver;
       case 2: return colors.bronze;
-      default: return colors.textDark;
+      default: return colors.primaryLight;
     }
   };
 
-  // trophy emoji for top 3
-  const getTrophyEmoji = (index) => {
+  const getRankLabel = (index) => {
+    switch (index) {
+      case 3: return '4TH';
+      default: return '5TH';
+    }
+  };
+
+  const getRankEmoji = (index) => {
     switch (index) {
       case 0: return '🏆';
       case 1: return '🥈';
@@ -152,11 +155,13 @@ export default function CurrentResultsScreen() {
     }
   };
 
+  const pad = (n) => String(n).padStart(2, '0');
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading results...</Text>
+        <ActivityIndicator size="large" color={colors.gold} />
+        <Text style={styles.loadingText}>LOADING RESULTS...</Text>
       </View>
     );
   }
@@ -165,7 +170,7 @@ export default function CurrentResultsScreen() {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text style={styles.errorText}>{error}</Text>
-        <Text style={styles.retryText} onPress={loadResults}>Tap to retry</Text>
+        <Text style={styles.retryText} onPress={loadResults}>TAP TO RETRY</Text>
       </View>
     );
   }
@@ -173,64 +178,125 @@ export default function CurrentResultsScreen() {
   if (results.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.emptyText}>No votes yet this week</Text>
-        <Text style={styles.emptySubtext}>Be the first to vote!</Text>
+        <Text style={styles.emptyText}>NO SCORES YET</Text>
+        <Text style={styles.emptySubtext}>Cast the first vote!</Text>
       </View>
     );
   }
 
+  const timerUnits = [
+    { val: pad(timeRemaining.days), unit: 'DAYS' },
+    { val: pad(timeRemaining.hours), unit: 'HRS' },
+    { val: pad(timeRemaining.minutes), unit: 'MIN' },
+    { val: pad(timeRemaining.seconds), unit: 'SEC' },
+  ];
+
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.primary}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
       }
     >
-      <Text style={styles.title}>Current Week's Results</Text>
-      <Text style={styles.subtitle}>{formatVotingPeriod()}</Text>
+      {/* header */}
+      <View style={styles.header}>
+        <Text style={styles.headerEyebrow}>WEEKLY</Text>
+        <Text style={styles.headerTitle}>LEADERBOARD</Text>
+        <View style={styles.headerDivider} />
+      </View>
 
-      {timeRemaining && (
-        <View style={styles.countdownBanner}>
-          <Text style={styles.bannerText}>⏱️ Voting ends in: {timeRemaining}</Text>
+      {/* countdown timer */}
+      {votingPeriod && (
+        <View style={styles.timerCard}>
+          <Text style={styles.timerLabel}>
+            {timeRemaining.ended ? 'VOTING ENDED' : 'VOTING ENDS IN'}
+          </Text>
+          {!timeRemaining.ended && (
+            <View style={styles.timerRow}>
+              {timerUnits.flatMap(({ val, unit }, i) => [
+                i > 0 && (
+                  <Text key={`sep-${i}`} style={styles.timerColon}>:</Text>
+                ),
+                <View key={unit} style={styles.timerBlock}>
+                  <Text style={styles.timerValue}>{val}</Text>
+                  <Text style={styles.timerUnit}>{unit}</Text>
+                </View>,
+              ])}
+            </View>
+          )}
         </View>
       )}
 
+      {/* total votes */}
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>TOTAL VOTES</Text>
+        <Text style={styles.totalCount}>{totalVotes.toLocaleString()}</Text>
+      </View>
+
+      {/* rank entries */}
       {sortedResults.map((charity, index) => {
         const percentage = getPercentage(charity.votes);
-        const barColor = getPodiumColor(index);
-        const trophy = getTrophyEmoji(index);
-        const rank = index + 1;
+        const rankColor = getRankColor(index);
+        const rankLabel = getRankLabel(index);
+        const rankEmoji = getRankEmoji(index);
+        const isFirst = index === 0;
 
-        return (
-          <View key={charity.id} style={styles.resultCard}>
-            <View style={styles.rankBadge}>
-              {trophy ? (
-                <Text style={styles.trophyEmoji}>{trophy}</Text>
+        const card = (
+          <View
+            style={[
+              styles.rankCard,
+              isFirst && styles.rankCardFirst,
+              { borderColor: isFirst ? rankColor : CARD_BORDER_DIM },
+            ]}
+          >
+            {/* top row: rank badge + score */}
+            <View style={styles.cardTopRow}>
+              {rankEmoji ? (
+                <Text style={styles.rankEmoji}>{rankEmoji}</Text>
               ) : (
-                <Text style={styles.rankNumber}>#{rank}</Text>
+                <View style={[styles.rankBadge, { borderColor: rankColor, backgroundColor: rankColor + '20' }]}>
+                  <Text style={[styles.rankBadgeText, { color: rankColor }]}>{rankLabel}</Text>
+                </View>
               )}
+              <Animated.Text
+                style={[
+                  styles.scoreValue,
+                  { color: rankColor },
+                  isFirst && { opacity: glowAnim },
+                ]}
+              >
+                {charity.votes.toLocaleString()}
+                <Text style={styles.scoreUnit}> {charity.votes === 1 ? 'VOTE' : 'VOTES'}</Text>
+              </Animated.Text>
             </View>
 
-            <View style={styles.cardHeader}>
-              <Text style={styles.charityName}>{charity.name}</Text>
-              <Text style={[styles.voteCount, { color: barColor }]}>
-                {charity.votes} {charity.votes === 1 ? 'vote' : 'votes'}
-              </Text>
-            </View>
+            {/* charity name */}
+            <Text style={styles.charityName} numberOfLines={2}>
+              {charity.name.toUpperCase()}
+            </Text>
 
-            <View style={styles.progressBarContainer}>
+            {/* xp bar */}
+            <View style={styles.xpTrack}>
               <View
                 style={[
-                  styles.progressBarFill,
-                  { width: `${percentage}%`, backgroundColor: barColor }
+                  styles.xpFill,
+                  { width: `${percentage}%`, backgroundColor: rankColor },
                 ]}
               />
             </View>
+            <Text style={[styles.percentText, { color: rankColor }]}>
+              {percentage.toFixed(1)}%
+            </Text>
           </View>
+        );
+
+        return isFirst ? (
+          <Animated.View key={charity.id} style={{ transform: [{ scale: pulseAnim }] }}>
+            {card}
+          </Animated.View>
+        ) : (
+          <View key={charity.id}>{card}</View>
         );
       })}
     </ScrollView>
@@ -241,112 +307,233 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  contentContainer: {
     padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold,
-    color: colors.white,
+
+  header: {
+    alignItems: 'center',
     marginTop: spacing.xxl,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: typography.sizes.md,
-    color: colors.grey,
     marginBottom: spacing.lg,
   },
-  countdownBanner: {
-    backgroundColor: colors.primary,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
-    alignItems: 'center',
+  headerEyebrow: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryLight,
+    letterSpacing: 8,
+    marginBottom: spacing.xs,
   },
-  bannerText: {
+  headerTitle: {
+    fontSize: 34,
+    fontWeight: '900',
     color: colors.white,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semiBold,
+    letterSpacing: 5,
   },
-  resultCard: {
-    borderRadius: borderRadius.lg,
+  headerDivider: {
+    width: 48,
+    height: 2,
+    backgroundColor: colors.gold,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: 1,
+  },
+  headerSub: {
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    letterSpacing: 1,
+  },
+
+  timerCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  timerLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryLight,
+    letterSpacing: 5,
+    marginBottom: spacing.sm,
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  timerBlock: {
+    alignItems: 'center',
+    minWidth: 52,
+    backgroundColor: colors.primary + '30',
+    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  timerValue: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '900',
+    color: colors.white,
+    letterSpacing: 2,
+  },
+  timerUnit: {
+    fontSize: 8,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryLight,
+    letterSpacing: 2,
+    marginTop: 2,
+  },
+  timerColon: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '900',
+    color: colors.primaryLight,
+    marginBottom: spacing.sm,
+  },
+
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '30',
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  totalLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryLight,
+    letterSpacing: 4,
+  },
+  totalCount: {
+    fontSize: typography.sizes.lg,
+    fontWeight: '900',
+    color: colors.white,
+    letterSpacing: 2,
+  },
+
+  rankCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
     padding: spacing.md,
     marginBottom: spacing.md,
-    backgroundColor: colors.background,
-    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  rankBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: 0,
-    zIndex: 1,
-    minWidth: 32,
-    alignItems: 'center',
+  rankCardFirst: {
+    borderWidth: 2,
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  trophyEmoji: {
-    fontSize: 32,
-  },
-  rankNumber: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.grey,
-  },
-  cardHeader: {
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
-    paddingLeft: spacing.xl,
+  },
+  rankEmoji: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  rankBadge: {
+    borderWidth: 1.5,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  rankBadgeText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
+  scoreValue: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  scoreUnit: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 2,
   },
   charityName: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semiBold,
-    color: colors.text,
-    flex: 1,
+    fontSize: typography.sizes.body,
+    fontWeight: '900',
+    color: colors.white,
+    letterSpacing: 1.5,
+    lineHeight: typography.sizes.body * 1.4,
+    marginBottom: spacing.sm,
   },
-  voteCount: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semiBold,
-    marginLeft: spacing.sm,
-  },
-  progressBarContainer: {
+
+  xpTrack: {
     height: 8,
-    backgroundColor: colors.grey + '30',
-    borderRadius: borderRadius.sm,
+    backgroundColor: '#FFFFFF12',
+    borderRadius: 2,
     overflow: 'hidden',
     marginBottom: spacing.xs,
   },
-  progressBarFill: {
+  xpFill: {
     height: '100%',
-    borderRadius: borderRadius.sm,
+    borderRadius: 2,
   },
+  percentText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 1,
+    textAlign: 'right',
+  },
+
+  
   loadingText: {
-    color: colors.text,
+    color: colors.primaryLight,
     fontSize: typography.sizes.md,
+    fontWeight: '900',
+    letterSpacing: 4,
     marginTop: spacing.md,
   },
   errorText: {
     color: colors.error,
     fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
     textAlign: 'center',
     marginBottom: spacing.md,
+    letterSpacing: 1,
   },
   retryText: {
-    color: colors.primary,
+    color: colors.gold,
     fontSize: typography.sizes.md,
-    textDecorationLine: 'underline',
+    fontWeight: '900',
+    letterSpacing: 3,
   },
   emptyText: {
-    color: colors.text,
+    color: colors.white,
     fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold,
+    fontWeight: '900',
+    letterSpacing: 4,
     marginBottom: spacing.sm,
   },
   emptySubtext: {
     color: colors.grey,
     fontSize: typography.sizes.lg,
+    letterSpacing: 2,
   },
 });

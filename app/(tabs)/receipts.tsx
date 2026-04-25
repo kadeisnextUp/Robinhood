@@ -2,12 +2,18 @@ import CardSwap, { Card } from '@/src/components/CardSwap';
 import ReceiptCard from '@/src/components/ReceiptCard';
 import { colors, spacing } from '@/src/theme';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export default function DonationReceiptsScreen() {
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // available vertical space: subtract paddingTop, header, footer, safe area bottom, tab bar
+  const CARD_AREA_HEIGHT = SCREEN_HEIGHT - 60 - 100 - insets.bottom - 49;
+  const CARD_HEIGHT = Math.min(520, Math.max(360, CARD_AREA_HEIGHT));
+
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -136,10 +142,10 @@ export default function DonationReceiptsScreen() {
         </Text>
       </View>
 
-      <View style={styles.cardSwapWrapper}>
+      <View style={[styles.cardSwapWrapper, { height: CARD_AREA_HEIGHT }]}>
         <CardSwap
           width={SCREEN_WIDTH}
-          height={580}
+          height={CARD_HEIGHT}
           cardDistance={30}
           verticalDistance={30}
           easing="elastic"
@@ -160,12 +166,6 @@ export default function DonationReceiptsScreen() {
         </CardSwap>
       </View>
 
-      <View style={styles.footer}>
-        <View style={styles.swipeIndicator}>
-          <Text style={styles.swipeArrow}>←</Text>
-          <Text style={styles.swipeText}>Swipe</Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -173,7 +173,7 @@ export default function DonationReceiptsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingTop: 60,
   },
   header: {
@@ -195,26 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: -20,
   },
   cardSwapWrapper: {
-    height: 800,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  footer: {
-    height: 90,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-  },
-  swipeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  swipeArrow: {
-    fontSize: 50,
-    color: colors.success,
-    marginBottom: -60,
-  },
-  swipeText: {
-    fontSize: 22,
-    color: colors.secondary,
   },
 });

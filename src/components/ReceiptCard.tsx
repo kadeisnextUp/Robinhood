@@ -27,7 +27,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
 }) => {
   return (
     <View style={styles.receipt}>
-      {/* Header */}
+      {/* header */}
       <View style={styles.header}>
         <Text style={styles.appName}>GIVE</Text>
         <View style={styles.checkmarkCircle}>
@@ -36,10 +36,10 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
         <Text style={styles.confirmed}>DONATION CONFIRMED</Text>
       </View>
 
-      {/* Divider */}
+      {/* divider */}
       <View style={styles.dottedLine} />
 
-      {/* Main Content */}
+      {/* main Content */}
       <View style={styles.content}>
         <Text style={styles.label}>DONATED TO</Text>
         <Text style={styles.charityName}>{charityName}</Text>
@@ -62,7 +62,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
         </View>
       </View>
 
-      {/* Footer Details */}
+      {/* footer Details */}
       <View style={styles.footer}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Date</Text>
@@ -78,7 +78,7 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
         </View>
       </View>
 
-      {/* Bottom Banner */}
+      {/* bottom Banner */}
       <View style={styles.bottomBanner}>
         <Text style={styles.bannerText}>
           Thank you for making a difference! 💚
@@ -91,12 +91,12 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
 const styles = StyleSheet.create({
   receipt: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.cardBackground,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
   header: {
-    backgroundColor: '#4ade80',
+    backgroundColor: colors.primary,
     paddingVertical: 30,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
     marginBottom: 16,
     letterSpacing: spacing.xs,
   },
@@ -112,29 +112,27 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#fff',
+    backgroundColor: colors.cardBackground,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   checkmark: {
     fontSize: 36,
-    color: colors.success,
+    color: colors.primary,
     fontWeight: 'bold',
   },
   confirmed: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.white,
+    color: colors.primaryLight,
     letterSpacing: 1.5,
   },
   dottedLine: {
-    height: 2,
-    backgroundColor: '#e5e5e5',
-    marginVertical: 0,
+    height: 1,
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: '#d1d1d1',
+    borderColor: colors.border,
   },
   content: {
     padding: 24,
@@ -142,45 +140,47 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    color: '#888',
+    color: colors.textLight,
     letterSpacing: 1,
     marginBottom: 8,
   },
   charityName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 24,
   },
   amountBox: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 20,
     width: '100%',
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: colors.border,
   },
   amountLabel: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textLight,
     marginBottom: 6,
   },
   amount: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#4ade80',
+    color: colors.primary,
   },
   statsGrid: {
     flexDirection: 'row',
     width: '100%',
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   statBox: {
     flex: 1,
@@ -189,22 +189,22 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#e5e5e5',
+    backgroundColor: colors.border,
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 11,
-    color: '#666',
+    color: colors.textLight,
   },
   footer: {
     paddingHorizontal: 24,
     paddingVertical: 20,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.divider,
     gap: 12,
   },
   detailRow: {
@@ -214,29 +214,29 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textLight,
     fontWeight: '500',
   },
   detailValue: {
     fontSize: 13,
-    color: '#111',
+    color: colors.text,
     fontWeight: '600',
   },
   detailValueMono: {
     fontSize: 11,
-    color: '#111',
+    color: colors.text,
     fontWeight: '600',
     fontFamily: 'monospace',
   },
   bottomBanner: {
-    backgroundColor: '#4ade80',
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     alignItems: 'center',
   },
   bannerText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.primaryLight,
   },
 });
 
