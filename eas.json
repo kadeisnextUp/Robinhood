@@ -43,6 +43,14 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./eas-credentials.json",
+        "track": "internal"
+      },
+      "ios": {
+        "ascAppId": "6761960741"
+      }
+    }
   }
 }
