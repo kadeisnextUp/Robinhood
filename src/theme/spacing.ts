@@ -1,4 +1,4 @@
-// Spacing system for consistent layout
+// spacing system 
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -10,11 +10,11 @@ export const spacing = {
   base: 100,
 };
 
-// Border radius values
+// border radius values
 export const borderRadius = {
   sm: 4,
   md: 8,
   lg: 12,
   xl: 16,
-  round: 9999, // Fully rounded (for pills/circles)
+  round: 9999, // fully rounded (for pills/circles)
 };
