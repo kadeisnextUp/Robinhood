@@ -3,6 +3,9 @@
 # Google service account key 
 eas-credentials.json
 
+# apple eas flow
+.eas/workflows/submit-ios.yml
+
 
 # dependencies
 node_modules/
