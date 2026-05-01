@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     textAlign: 'center',
@@ -145,6 +146,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -155,6 +157,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: spacing.md,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -171,6 +174,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.white,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
 });

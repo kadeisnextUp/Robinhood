@@ -183,6 +183,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.secondary,
     marginBottom: 8,
@@ -190,6 +191,7 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: spacing.sm,
     fontSize: 16,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.white,
     textAlign: 'center',
     marginBottom: -20,

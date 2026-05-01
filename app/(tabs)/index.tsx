@@ -167,7 +167,7 @@ export default function HomeScreen() {
                 );
 
                 if (fnError) {
-                  // Try to extract the JSON error message from the response body
+                  // try to extract the JSON error message from the response body
                   let msg = 'Failed to submit nomination.';
                   try {
                     const body = await (fnError as any).context?.json?.();
@@ -360,7 +360,7 @@ export default function HomeScreen() {
         )}
 
         {/* weekly Voting Section */}
-        <Text style={styles.header}>This week's Charity Spotlight</Text>
+        <Text style={styles.header}>Charity Spotlight</Text>
         {userHasVoted && (
           <Text style={styles.userVoteStatus}>
             You have voted this week. Come back next week to vote again.
@@ -419,6 +419,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     color: colors.text,
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -442,6 +443,7 @@ const styles = StyleSheet.create({
   },
   resultsHeader: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.textSecondary,
     paddingHorizontal: spacing.xs,
@@ -469,16 +471,19 @@ const styles = StyleSheet.create({
   },
   resultName: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.text,
     marginBottom: 2,
   },
   resultEin: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
   },
   resultLocation: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -495,6 +500,7 @@ const styles = StyleSheet.create({
   listedBadgeText: {
     color: colors.white,
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   nominateBadge: {
@@ -506,16 +512,19 @@ const styles = StyleSheet.create({
   nominateBadgeText: {
     color: colors.white,
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   noResultsText: {
     color: colors.textSecondary,
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     textAlign: 'center',
     paddingVertical: spacing.sm,
   },
   header: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     textAlign: 'center',
@@ -525,6 +534,7 @@ const styles = StyleSheet.create({
   },
   userVoteStatus: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.lg,
@@ -552,6 +562,7 @@ const styles = StyleSheet.create({
   },
   charityName: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     alignSelf: 'center',
@@ -559,6 +570,7 @@ const styles = StyleSheet.create({
   },
   charityCategory: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     backgroundColor: colors.primaryLight,
     alignSelf: 'flex-start',
@@ -572,6 +584,7 @@ const styles = StyleSheet.create({
   },
   charityDescription: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     alignSelf: 'center',
     marginBottom: spacing.md,
@@ -589,6 +602,7 @@ const styles = StyleSheet.create({
   voteButtonText: {
     color: colors.white,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   voteButtonDisabled: {
@@ -602,6 +616,7 @@ const styles = StyleSheet.create({
   websiteButtonText: {
     color: colors.primary,
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     textDecorationLine: 'underline',
   },
 });

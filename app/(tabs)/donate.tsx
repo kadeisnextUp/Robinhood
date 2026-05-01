@@ -208,7 +208,7 @@ export default function DonateScreen() {
     >
       {/* hero */}
       <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>THIS WEEK'S GIVING POOL</Text>
+        <Text style={styles.heroEyebrow}>THE GIVING POOL</Text>
         <Text style={styles.heroAmount}>${weeklyPool.toFixed(2)}</Text>
         <View style={styles.heroDivider} />
         <Text style={styles.heroMission}>
@@ -314,6 +314,7 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.cardBackground,
     letterSpacing: 4,
@@ -322,6 +323,7 @@ const styles = StyleSheet.create({
   },
   heroAmount: {
     fontSize: 56,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.white,
     letterSpacing: -1,
@@ -338,6 +340,7 @@ const styles = StyleSheet.create({
   },
   heroMission: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.white,
     textAlign: 'center',
     lineHeight: typography.sizes.body * 1.6,
@@ -354,6 +357,7 @@ const styles = StyleSheet.create({
   },
   countdownText: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.white,
     letterSpacing: 0.5,
@@ -379,10 +383,12 @@ const styles = StyleSheet.create({
   },
   contributionText: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.white,
     fontWeight: typography.weights.medium,
   },
   contributionAmount: {
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.success,
   },
@@ -399,12 +405,14 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   cardSubtitle: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     marginBottom: spacing.lg,
     lineHeight: typography.sizes.sm * 1.6,
@@ -430,6 +438,7 @@ const styles = StyleSheet.create({
   },
   presetBtnText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.textLight,
   },
@@ -449,6 +458,7 @@ const styles = StyleSheet.create({
   },
   dollarSign: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primary,
     marginRight: spacing.xs,
@@ -456,6 +466,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     paddingVertical: 14,
     color: colors.text,
@@ -478,6 +489,7 @@ const styles = StyleSheet.create({
   },
   donateBtnText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.white,
     letterSpacing: 0.3,
@@ -485,6 +497,7 @@ const styles = StyleSheet.create({
 
   trustLine: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     textAlign: 'center',
     letterSpacing: 0.3,
