@@ -15,11 +15,22 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
-// apply Fredoka as the default font for all Text and TextInput components
-(Text as any).defaultProps = (Text as any).defaultProps ?? {};
-(Text as any).defaultProps.style = { fontFamily: 'Fredoka_400Regular' };
-(TextInput as any).defaultProps = (TextInput as any).defaultProps ?? {};
-(TextInput as any).defaultProps.style = { fontFamily: 'Fredoka_400Regular' };
+// React 19 removed defaultProps for function components, so patch render directly.
+// This prepends fontFamily to the style array so it applies even when a style prop is passed.
+const patchFont = (Component: any) => {
+  const original = Component.render;
+  if (typeof original !== 'function') return;
+  Component.render = function (props: any, ref: any) {
+    const base = { fontFamily: 'Fredoka_400Regular' };
+    const style = Array.isArray(props.style)
+      ? [base, ...props.style]
+      : props.style != null ? [base, props.style] : base;
+    return original.call(this, { ...props, style }, ref);
+  };
+};
+
+patchFont(Text);
+patchFont(TextInput);
 
 function AppContent() {
   usePushNotifications();
