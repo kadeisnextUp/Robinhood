@@ -938,6 +938,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     paddingHorizontal: spacing.lg,
@@ -955,6 +956,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: spacing.md,
@@ -967,22 +969,26 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_600SemiBold',
     color: colors.text,
     fontWeight: typography.weights.semiBold,
     marginBottom: spacing.xs,
   },
   cardSubtext: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   proofUrl: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.primary,
     marginBottom: spacing.sm,
   },
   label: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
     marginBottom: spacing.xs,
     marginTop: spacing.sm,
@@ -993,6 +999,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.text,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1019,11 +1026,13 @@ const styles = StyleSheet.create({
   },
   periodOptionText: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_600SemiBold',
     color: colors.text,
     fontWeight: typography.weights.semiBold,
   },
   periodWinner: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
@@ -1047,6 +1056,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.text,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   smallButton: {
@@ -1064,6 +1074,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.white,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   rowButtons: {
@@ -1093,22 +1104,26 @@ const styles = StyleSheet.create({
   approvalBadgeText: {
     color: colors.white,
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   incompleteWarning: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.error,
     marginBottom: spacing.sm,
     fontStyle: 'italic',
   },
   errorText: {
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: spacing.sm,
   },
   errorSubtext: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textSecondary,
   },
   backButton: {

@@ -427,6 +427,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
   },
@@ -466,17 +467,20 @@ const styles = StyleSheet.create({
   },
   profileCardName: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
   },
   profileCardEmail: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     marginTop: 2,
   },
 
   sectionLabel: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.grey,
     textTransform: 'uppercase',
@@ -526,6 +530,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.text,
     fontWeight: typography.weights.medium,
     flex: 1,
@@ -538,6 +543,7 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     textAlign: 'right',
     flexShrink: 1,
@@ -560,6 +566,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primary,
   },
@@ -574,6 +581,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.white,
   },
@@ -603,12 +611,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: spacing.sm,
   },
   modalMessage: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -629,6 +639,7 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.text,
     fontWeight: typography.weights.medium,
   },
@@ -651,11 +662,13 @@ const styles = StyleSheet.create({
   comingSoonText: {
     flex: 1,
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     lineHeight: 18,
   },
   modalConfirmText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.white,
   },

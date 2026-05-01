@@ -103,6 +103,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 16,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '700',
     color: colors.white,
     marginBottom: 16,
@@ -119,11 +120,13 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     fontSize: 36,
+    fontFamily: 'Fredoka_700Bold',
     color: colors.primary,
     fontWeight: 'bold',
   },
   confirmed: {
     fontSize: 12,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: '600',
     color: colors.primaryLight,
     letterSpacing: 1.5,
@@ -140,12 +143,14 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     letterSpacing: 1,
     marginBottom: 8,
   },
   charityName: {
     fontSize: 24,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
@@ -163,11 +168,13 @@ const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: 12,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     marginBottom: 6,
   },
   amount: {
     fontSize: 42,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.primary,
   },
@@ -193,12 +200,14 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 24,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 11,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
   },
   footer: {
@@ -214,11 +223,13 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 13,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.textLight,
     fontWeight: '500',
   },
   detailValue: {
     fontSize: 13,
+    fontFamily: 'Fredoka_600SemiBold',
     color: colors.text,
     fontWeight: '600',
   },
@@ -235,6 +246,7 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     fontSize: 13,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: '600',
     color: colors.primaryLight,
   },

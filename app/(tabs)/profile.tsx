@@ -485,6 +485,7 @@ const styles = StyleSheet.create({
   adminChipText: {
     color: colors.cardBackground,
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   settingsBtn: {
@@ -520,6 +521,7 @@ const styles = StyleSheet.create({
   },
   displayName: {
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: 2,
@@ -531,6 +533,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.primaryLight,
     fontWeight: typography.weights.medium,
   },
@@ -546,6 +549,7 @@ const styles = StyleSheet.create({
   },
   atSign: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.primaryLight,
     fontWeight: typography.weights.medium,
     marginRight: 2,
@@ -553,6 +557,7 @@ const styles = StyleSheet.create({
   usernameInput: {
     flex: 1,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.text,
     paddingVertical: 0,
   },
@@ -581,11 +586,13 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primary,
   },
   statLabel: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_500Medium',
     color: colors.grey,
     fontWeight: typography.weights.medium,
     marginTop: 2,
@@ -604,6 +611,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginBottom: spacing.sm,
@@ -643,16 +651,19 @@ const styles = StyleSheet.create({
   },
   listCardTitle: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.text,
   },
   listCardSub: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     marginTop: 2,
   },
   donationAmount: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.success,
   },
@@ -665,6 +676,7 @@ const styles = StyleSheet.create({
   statusText: {
     color: colors.white,
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
 
@@ -678,11 +690,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
   },
 
   notLoggedInTitle: {
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.text,
     marginTop: spacing.lg,
@@ -690,6 +704,7 @@ const styles = StyleSheet.create({
   },
   notLoggedInSubtitle: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
@@ -708,6 +723,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: colors.white,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
   signupButton: {
@@ -722,16 +738,19 @@ const styles = StyleSheet.create({
   signupButtonText: {
     color: colors.primary,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
 
   mutedText: {
     marginTop: spacing.md,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
   },
   errorText: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.error,
     marginBottom: spacing.lg,
     textAlign: 'center',
@@ -746,6 +765,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: colors.white,
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
 });

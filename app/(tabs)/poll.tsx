@@ -324,6 +324,7 @@ const styles = StyleSheet.create({
   },
   headerEyebrow: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primaryLight,
     letterSpacing: 8,
@@ -331,6 +332,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 34,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 5,
@@ -345,6 +347,7 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
     letterSpacing: 1,
   },
@@ -361,6 +364,7 @@ const styles = StyleSheet.create({
   },
   timerLabel: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primaryLight,
     letterSpacing: 5,
@@ -383,12 +387,14 @@ const styles = StyleSheet.create({
   },
   timerValue: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 2,
   },
   timerUnit: {
     fontSize: 8,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primaryLight,
     letterSpacing: 2,
@@ -396,6 +402,7 @@ const styles = StyleSheet.create({
   },
   timerColon: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.primaryLight,
     marginBottom: spacing.sm,
@@ -415,12 +422,14 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.primaryLight,
     letterSpacing: 4,
   },
   totalCount: {
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 2,
@@ -452,6 +461,7 @@ const styles = StyleSheet.create({
   },
   rankEmoji: {
     fontSize: 28,
+    fontFamily: 'Fredoka_400Regular',
     lineHeight: 32,
   },
   rankBadge: {
@@ -462,21 +472,25 @@ const styles = StyleSheet.create({
   },
   rankBadgeText: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     letterSpacing: 3,
   },
   scoreValue: {
     fontSize: typography.sizes.xl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     letterSpacing: 1,
   },
   scoreUnit: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     letterSpacing: 2,
   },
   charityName: {
     fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 1.5,
@@ -497,15 +511,17 @@ const styles = StyleSheet.create({
   },
   percentText: {
     fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     letterSpacing: 1,
     textAlign: 'right',
   },
 
-  
+
   loadingText: {
     color: colors.primaryLight,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     letterSpacing: 4,
     marginTop: spacing.md,
@@ -513,6 +529,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     textAlign: 'center',
     marginBottom: spacing.md,
@@ -521,12 +538,14 @@ const styles = StyleSheet.create({
   retryText: {
     color: colors.gold,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     letterSpacing: 3,
   },
   emptyText: {
     color: colors.white,
     fontSize: typography.sizes.xxl,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
     letterSpacing: 4,
     marginBottom: spacing.sm,
@@ -534,6 +553,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: colors.grey,
     fontSize: typography.sizes.lg,
+    fontFamily: 'Fredoka_400Regular',
     letterSpacing: 2,
   },
 });

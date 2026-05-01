@@ -1,4 +1,4 @@
-import { colors, spacing } from '@/src/theme';
+import { colors, spacing, typography } from '@/src/theme';
 import { FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
@@ -18,7 +18,12 @@ export default function TabLayout() {
           paddingBottom: spacing.sm,
           paddingTop: spacing.sm,
         },
+        tabBarLabelStyle: {
+          fontSize: typography.sizes.xs,
+          fontFamily: 'Fredoka_500Medium',
+        },
         headerShown: false,
+
       }}
     >
       <Tabs.Screen

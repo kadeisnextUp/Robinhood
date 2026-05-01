@@ -182,12 +182,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     marginBottom: 40,
     textAlign: 'center',
@@ -198,6 +200,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: spacing.md,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -218,6 +221,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.white,
     fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
   linkText: {
@@ -227,6 +231,7 @@ const styles = StyleSheet.create({
   },
   linkBold: {
     color: colors.primary,
+    fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
   },
 });
