@@ -15,8 +15,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
-// React 19 removed defaultProps for function components, so patch render directly.
-// This prepends fontFamily to the style array so it applies even when a style prop is passed.
+// this prepends fontFamily to the style array so it applies even when a style prop is passed.
 const patchFont = (Component: any) => {
   const original = Component.render;
   if (typeof original !== 'function') return;
