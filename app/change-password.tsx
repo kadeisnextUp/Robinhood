@@ -5,10 +5,12 @@ import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'reac
 import { useAuth } from '../contexts/authContext';
 import { supabase } from '../services/supabase';
 import { colors, spacing, typography } from '../src/theme';
+import { usePostHog } from 'posthog-react-native';
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const posthog = usePostHog();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -53,6 +55,7 @@ export default function ChangePasswordScreen() {
         return;
       }
 
+      posthog.capture('password_changed');
       Alert.alert('Success', 'Your password has been updated.', [
         { text: 'OK', onPress: () => router.back() },
       ]);

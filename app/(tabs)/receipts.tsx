@@ -3,10 +3,12 @@ import ReceiptCard from '@/src/components/ReceiptCard';
 import { colors, spacing } from '@/src/theme';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
 export default function DonationReceiptsScreen() {
+  const posthog = usePostHog();
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -85,7 +87,7 @@ export default function DonationReceiptsScreen() {
       );
 
       setReceipts(receiptsWithVotes);
-
+      posthog.capture('receipts_viewed', { receipt_count: receiptsWithVotes.length });
     } catch (err) {
       console.error('Error loading receipts:', err);
       setError('Failed to load donation receipts.');

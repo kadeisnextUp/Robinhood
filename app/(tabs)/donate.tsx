@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/authContext';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
+import { usePostHog } from 'posthog-react-native';
 
 type VotingPeriod = { id: string; start_date: string; end_date: string };
 
@@ -30,6 +31,7 @@ export default function DonateScreen() {
 
   const { requireAuth, user } = useRequireAuth();
   const { session } = useAuth();
+  const posthog = usePostHog();
 
   useEffect(() => {
     loadResults();
@@ -123,6 +125,11 @@ export default function DonateScreen() {
     requireAuth(async () => {
       try {
         setDonating(true);
+        posthog.capture('donation_initiated', {
+          amount,
+          voting_period_id: votingPeriod?.id ?? null,
+          amount_type: selectedPreset ? 'preset' : 'custom',
+        });
 
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-order', {
           body: { amount: amount.toFixed(2), userId: user?.id },
@@ -178,6 +185,10 @@ export default function DonateScreen() {
             throw new Error('Payment was not completed');
           }
 
+          posthog.capture('donation_completed', {
+            amount,
+            voting_period_id: sessionData.votingPeriodId ?? null,
+          });
           setDonationAmount('');
           setSelectedPreset(null);
           await loadResults();
@@ -188,6 +199,7 @@ export default function DonateScreen() {
             [{ text: 'OK' }]
           );
         } else if (result.type === 'cancel') {
+          posthog.capture('donation_cancelled', { amount });
           Alert.alert('Donation Cancelled', 'Your donation was not completed.');
         }
       } catch (err) {

@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
 import { isProfane } from '../../src/utils/profanity';
+import { usePostHog } from 'posthog-react-native';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 
@@ -14,6 +15,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const posthog = usePostHog();
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -66,7 +68,7 @@ export default function SignupScreen() {
         return;
       }
 
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
@@ -77,6 +79,13 @@ export default function SignupScreen() {
       if (error) {
         Alert.alert('Signup Failed', error.message);
       } else {
+        posthog.identify(signUpData.user?.id ?? email.trim(), {
+          $set: { email: email.trim(), username: username.toLowerCase() },
+          $set_once: { signup_date: new Date().toISOString() },
+        });
+        posthog.capture('user_signed_up', {
+          username: username.toLowerCase(),
+        });
         Alert.alert(
           'Check Your Email!',
           'We sent you a confirmation email. Please verify your email before logging in.',

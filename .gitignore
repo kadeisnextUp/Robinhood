@@ -55,3 +55,5 @@ app-example
 CLAUDE.md
 AGENTS.md
 .claude/
+
+.env.local
