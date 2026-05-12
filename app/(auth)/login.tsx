@@ -4,12 +4,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
+import { usePostHog } from 'posthog-react-native';
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<TextInput>(null);
+  const posthog = usePostHog();
 
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
 
@@ -40,7 +42,7 @@ export default function LoginScreen() {
         emailToUse = lookedUpEmail;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: emailToUse,
         password,
       });
@@ -48,6 +50,15 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('Login Failed', 'Invalid username or password');
       } else {
+        const userId = signInData.user?.id;
+        const username = trimmed.includes('@') ? undefined : trimmed.toLowerCase();
+        posthog.identify(userId ?? emailToUse, {
+          $set: { email: emailToUse, ...(username ? { username } : {}) },
+          $set_once: { first_login_date: new Date().toISOString() },
+        });
+        posthog.capture('user_logged_in', {
+          login_method: trimmed.includes('@') ? 'email' : 'username',
+        });
         router.replace('/(tabs)');
       }
     } catch (e: any) {

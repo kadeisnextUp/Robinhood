@@ -10,12 +10,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 
 
 const CARD_BG = '#170F05';
 const CARD_BORDER_DIM = '#2A1E0E';
 
 export default function CurrentResultsScreen() {
+  const posthog = usePostHog();
   const [results, setResults] = useState<{ id: string; name: string; votes: number }[]>([]);
   const [votingPeriod, setVotingPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,10 @@ export default function CurrentResultsScreen() {
       );
 
       setResults(charitiesWithVotes);
+      posthog.capture('leaderboard_viewed', {
+        total_votes: charitiesWithVotes.reduce((sum, c) => sum + c.votes, 0),
+        charity_count: charitiesWithVotes.length,
+      });
     } catch (err) {
       setError('Failed to load results. Please try again.');
       console.error('Error loading results:', err);

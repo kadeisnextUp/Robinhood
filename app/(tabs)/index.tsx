@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
+import { usePostHog } from 'posthog-react-native';
 
 type SearchResult = {
   name: string;
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const [nominatingEin, setNominatingEin] = useState<string | null>(null);
 
   const { requireAuth } = useRequireAuth();
+  const posthog = usePostHog();
 
   useEffect(() => {
     loadCharities();
@@ -139,7 +141,12 @@ export default function HomeScreen() {
         });
 
         if (fnError) throw fnError;
-        setSearchResults(data.results ?? []);
+        const results = data.results ?? [];
+        setSearchResults(results);
+        posthog.capture('charity_search_performed', {
+          query,
+          result_count: results.length,
+        });
       } catch (err) {
         Alert.alert('Search Error', 'Failed to search charities. Please try again.');
         console.error(err);
@@ -179,6 +186,10 @@ export default function HomeScreen() {
                   return;
                 }
 
+                posthog.capture('charity_nomination_submitted', {
+                  charity_name: data.charityName,
+                  ein: result.ein,
+                });
                 Alert.alert(
                   'Nomination Submitted!',
                   `Your nomination for ${data.charityName} has been submitted for admin review.`
@@ -225,6 +236,11 @@ export default function HomeScreen() {
 
                 if (error) throw error;
 
+                posthog.capture('charity_vote_cast', {
+                  charity_id: charityId,
+                  charity_name: charityName,
+                  voting_period_id: currentPeriodId,
+                });
                 Alert.alert('Thank you for voting!', `Your vote for ${charityName} has been recorded.`);
                 setUserHasVoted(true);
               } catch (err) {

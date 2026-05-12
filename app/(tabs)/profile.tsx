@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../contexts/authContext';
 import { supabase } from '../../services/supabase';
 import { isProfane } from '../../src/utils/profanity';
+import { usePostHog } from 'posthog-react-native';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 const COOLDOWN_DAYS = 5;
@@ -53,6 +54,7 @@ const STATUS_COLORS = {
 };
 
 export default function ProfileScreen() {
+  const posthog = usePostHog();
   const { session } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -231,6 +233,7 @@ export default function ProfileScreen() {
 
       setProfile({ ...profile, username: trimmed, usernameUpdatedAt: now });
       setIsEditingUsername(false);
+      posthog.capture('username_changed');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not update username.');
     } finally {

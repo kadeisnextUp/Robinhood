@@ -20,10 +20,12 @@ import {
 import { useAuth } from '../contexts/authContext';
 import { supabase } from '../services/supabase';
 import { borderRadius, colors, spacing, typography } from '../src/theme';
+import { usePostHog } from 'posthog-react-native';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { session } = useAuth();
+  const posthog = usePostHog();
 
   const [userEmail, setUserEmail] = useState<string>('');
   const [userUsername, setUserUsername] = useState<string>('');
@@ -156,6 +158,8 @@ export default function SettingsScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
+          posthog.capture('user_signed_out');
+          posthog.reset();
           await supabase.auth.signOut();
           router.back();
         },
@@ -164,6 +168,8 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = async () => {
+    posthog.capture('account_deleted');
+    posthog.reset();
     await supabase.auth.signOut();
     setDeleteModalVisible(false);
     router.back();
