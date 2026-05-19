@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const PAYPAL_BASE_URL = 'https://api-m.paypal.com'; 
+const PAYPAL_BASE_URL = 'https://api-m.paypal.com';
 
 async function getPayPalAccessToken(): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID')!;
@@ -21,10 +21,34 @@ async function getPayPalAccessToken(): Promise<string> {
 
 Deno.serve(async (req) => {
   try {
-    const { orderId, userId, votingPeriodId } = await req.json();
+    // verify auth and extract user from JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    if (!orderId || !userId || !votingPeriodId) {
-      return new Response(JSON.stringify({ error: 'orderId, userId, and votingPeriodId are required' }), {
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Only accept orderId from the client — userId and votingPeriodId come from the PayPal order's custom_id
+    const { orderId } = await req.json();
+
+    if (!orderId) {
+      return new Response(JSON.stringify({ error: 'orderId is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -45,6 +69,27 @@ Deno.serve(async (req) => {
 
     if (!captureResponse.ok || captureData.status !== 'COMPLETED') {
       throw new Error(captureData.message || 'Payment capture failed');
+    }
+
+    // extract user_id and voting_period_id from the custom_id we set at order creation —
+    // these are never trusted from the client request body
+    const customIdRaw = captureData.purchase_units?.[0]?.custom_id;
+    let userId: string;
+    let votingPeriodId: string;
+    try {
+      const customId = JSON.parse(customIdRaw);
+      userId = customId.user_id;
+      votingPeriodId = customId.voting_period_id;
+    } catch {
+      throw new Error('Invalid order metadata');
+    }
+
+    // Verify the authenticated user is the one who created this order
+    if (userId !== user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // pull out the data we need to log the donation
