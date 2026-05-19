@@ -1,6 +1,7 @@
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { usePostHog } from 'posthog-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,7 +17,6 @@ import {
   View,
 } from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
-import { usePostHog } from 'posthog-react-native';
 
 type SearchResult = {
   name: string;
@@ -129,6 +129,10 @@ export default function HomeScreen() {
     const query = searchQuery.trim();
     if (query.length < 2) {
       Alert.alert('Search', 'Please enter at least 2 characters.');
+      return;
+    }
+    if (query.length > 100) {
+      Alert.alert('Search', 'Search query is too long (max 100 characters).');
       return;
     }
 
@@ -336,7 +340,7 @@ export default function HomeScreen() {
                   activeOpacity={result.inDatabase ? 1 : 0.7}
                 >
                   <View style={styles.resultRow}>
-                    {/* Logo placeholder or question mark */}
+                    {/* logo placeholder or question mark */}
                     <View style={styles.resultIconContainer}>
                       {result.inDatabase ? (
                         <Ionicons name="checkmark-circle" size={32} color={colors.success} />

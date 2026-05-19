@@ -162,7 +162,7 @@ export default function DonateScreen() {
 
         if (result.type === 'success') {
           const { data: captureData, error: captureError } = await supabase.functions.invoke('capture-paypal-order', {
-            body: { orderId: sessionData.orderId, userId: user?.id, votingPeriodId: sessionData.votingPeriodId },
+            body: { orderId: sessionData.orderId },
             headers: { Authorization: `Bearer ${session?.access_token}` },
           });
 

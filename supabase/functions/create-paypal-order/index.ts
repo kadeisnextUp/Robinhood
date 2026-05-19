@@ -2,7 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const PAYPAL_BASE_URL = 'https://api-m.paypal.com';
 
-// get a PayPal access token using client credentials
 async function getPayPalAccessToken(): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID')!;
   const clientSecret = Deno.env.get('PAYPAL_CLIENT_SECRET')!;
@@ -25,15 +24,40 @@ async function getPayPalAccessToken(): Promise<string> {
 
 Deno.serve(async (req) => {
   try {
-    const { amount, userId } = await req.json();
+    // verify auth and extract user from JWT — never trust userId from the request body
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    // validate minimum donation amount
-    if (!amount || parseFloat(amount) < 1.00) {
-      return new Response(JSON.stringify({ error: 'Minimum donation is $1.00' }), {
+    const supabaseUser = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { amount } = await req.json();
+
+    // validate amount: between $1.00 and $10,000.00
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed < 1.00 || parsed > 10000.00) {
+      return new Response(JSON.stringify({ error: 'Amount must be between $1.00 and $10,000.00' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    const safeAmount = parsed.toFixed(2);
 
     // get active voting period from Supabase
     const supabase = createClient(
@@ -74,11 +98,11 @@ Deno.serve(async (req) => {
           {
             amount: {
               currency_code: 'USD',
-              value: parseFloat(amount).toFixed(2),
+              value: safeAmount,
             },
             description: 'Weekly charity pool donation',
             // store user + voting period in custom_id so we have it at capture time
-            custom_id: JSON.stringify({ user_id: userId, voting_period_id: votingPeriodId }),
+            custom_id: JSON.stringify({ user_id: user.id, voting_period_id: votingPeriodId }),
           },
         ],
         application_context: {
@@ -104,8 +128,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-  }
-   catch (error) {
+  } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

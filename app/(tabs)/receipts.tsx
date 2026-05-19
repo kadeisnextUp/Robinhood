@@ -29,6 +29,12 @@ export default function DonationReceiptsScreen() {
       setLoading(true);
       setError(null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('Sign in to view donation receipts.');
+        return;
+      }
+
       // get all closed donations with charity info and period info
       const { data: donations, error: donationsError } = await supabase
         .from('donations')

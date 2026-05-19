@@ -30,7 +30,8 @@ Deno.serve(async (req) => {
   }
 
   const { token } = await req.json();
-  if (!token || !token.startsWith("ExponentPushToken[")) {
+  const PUSH_TOKEN_REGEX = /^ExponentPushToken\[[a-zA-Z0-9_-]{1,64}\]$/;
+  if (!token || !PUSH_TOKEN_REGEX.test(token)) {
     return new Response(JSON.stringify({ error: "Invalid push token" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

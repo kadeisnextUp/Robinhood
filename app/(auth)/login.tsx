@@ -10,10 +10,77 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resolvedEmail, setResolvedEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetCode, setResetCode] = useState('');
   const passwordRef = useRef<TextInput>(null);
   const posthog = usePostHog();
 
   const { returnTo } = useLocalSearchParams<{ returnTo: string }>();
+
+  const handleForgotPassword = async () => {
+    const raw = resetEmail.trim();
+    if (!raw) {
+      Alert.alert('Error', 'Please enter your email or username.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let email = raw;
+
+      if (!raw.includes('@')) {
+        const { data: lookedUpEmail, error: rpcError } = await supabase.rpc(
+          'get_email_by_username',
+          { p_username: raw.toLowerCase() }
+        );
+        if (rpcError || !lookedUpEmail) {
+          Alert.alert('Error', 'No account found with that username.');
+          return;
+        }
+        email = lookedUpEmail;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'fundit://reset-password',
+      });
+
+      if (error) throw error;
+
+      setResolvedEmail(email);
+      setResetSent(true);
+      posthog.capture('password_reset_requested');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const code = resetCode.trim();
+    if (!/^\d{6,8}$/.test(code)) {
+      Alert.alert('Error', 'Enter the reset code from your email.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: resolvedEmail,
+        token: code,
+        type: 'recovery',
+      });
+      if (error) throw error;
+      posthog.capture('password_reset_otp_verified');
+      router.push('/reset-password');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Invalid code. Try requesting a new one.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!identifier || !password) {
@@ -68,6 +135,76 @@ export default function LoginScreen() {
     }
   };
 
+  if (forgotMode) {
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.backButton} onPress={() => { setForgotMode(false); setResetSent(false); setResetEmail(''); setResetCode(''); }}>
+          <Ionicons name="arrow-back" size={32} color={colors.secondary} />
+        </TouchableOpacity>
+
+        <View style={styles.content}>
+          {resetSent ? (
+            <>
+              <Text style={styles.title}>Check your email</Text>
+              <Text style={styles.subtitle}>
+                Enter the reset code sent to {resolvedEmail}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Reset code"
+                placeholderTextColor={colors.grey}
+                value={resetCode}
+                onChangeText={text => setResetCode(text.replace(/\D/g, '').slice(0, 8))}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleVerifyOtp}
+                maxLength={8}
+                autoFocus
+              />
+              <TouchableOpacity style={styles.button} onPress={handleVerifyOtp} disabled={loading}>
+                <Text style={styles.buttonText}>{loading ? 'Verifying...' : 'Verify Code'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setResetSent(false); setResetCode(''); }} style={styles.forgotLink}>
+                <Text style={styles.linkBold}>Resend Code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setForgotMode(false); setResetSent(false); setResetEmail(''); setResetCode(''); }}>
+                <Text style={[styles.linkText, { marginTop: 8 }]}>Back to Login</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.title}>Reset Password</Text>
+              <Text style={styles.subtitle}>Enter your email or username and we'll send a reset link</Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Email or Username"
+                placeholderTextColor={colors.grey}
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="send"
+                onSubmitEditing={handleForgotPassword}
+                autoFocus
+              />
+
+              <TouchableOpacity style={styles.button} onPress={handleForgotPassword} disabled={loading}>
+                <Text style={styles.buttonText}>{loading ? 'Sending...' : 'Send Reset Link'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => setForgotMode(false)}>
+                <Text style={styles.linkText}>
+                  Remembered it? <Text style={styles.linkBold}>Back to Login</Text>
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -113,6 +250,10 @@ export default function LoginScreen() {
           <Text style={styles.buttonText}>
             {loading ? 'Logging in...' : 'Login'}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setForgotMode(true)} style={styles.forgotLink}>
+          <Text style={styles.linkBold}>Forgot Password?</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push({
@@ -182,6 +323,10 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold as any,
+  },
+  forgotLink: {
+    marginTop: 14,
+    alignItems: 'center',
   },
   linkText: {
     marginTop: 20,

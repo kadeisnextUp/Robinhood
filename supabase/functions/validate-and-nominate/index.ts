@@ -1,5 +1,5 @@
 // supabase/functions/validate-and-nominate/index.ts
-// Validates an EIN against charityapi.org then creates a nomination.
+// validates an EIN against charityapi.org then creates a nomination.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CHARITYAPI_BASE = "https://api.charityapi.org/api";
@@ -40,6 +40,18 @@ Deno.serve(async (req) => {
     });
   }
 
+  // validate EIN format before hitting the external API
+  const einVal = String(ein).replace(/-/g, "");
+  if (!/^\d{9}$/.test(einVal)) {
+    return new Response(JSON.stringify({ error: "Invalid EIN format. Must be 9 digits (XX-XXXXXXX)." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // clamp charity name length
+  const nameInput = typeof name === "string" ? name.trim().slice(0, 200) : undefined;
+
   const apiKey = Deno.env.get("CHARITYAPI_KEY")!;
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -47,7 +59,6 @@ Deno.serve(async (req) => {
   );
 
   // validate EIN against charityapi.org
-  const einVal = ein.replace(/-/g, "");
   console.log(`Validating EIN: ${einVal}`);
   const apiRes = await fetch(`${CHARITYAPI_BASE}/organizations/${encodeURIComponent(einVal)}`, {
     headers: { apikey: apiKey },
@@ -79,7 +90,7 @@ Deno.serve(async (req) => {
 
   // store EIN as raw digits to match DB format
   const rawEin = org.ein.replace(/-/g, "");
-  const charityName = name?.trim() || org.name?.trim() || "Unknown Charity";
+  const charityName = nameInput || org.name?.trim().slice(0, 200) || "Unknown Charity";
 
   // check if charity already exists in DB
   const { data: existing } = await supabaseAdmin

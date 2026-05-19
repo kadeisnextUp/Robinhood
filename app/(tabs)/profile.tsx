@@ -209,28 +209,23 @@ export default function ProfileScreen() {
 
     setUsernameLoading(true);
     try {
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('username', trimmed)
-        .maybeSingle();
+      const { data, error: fnError } = await supabase.functions.invoke('update-username', {
+        body: { username: trimmed },
+      });
 
-      if (existing) {
-        Alert.alert('Error', 'That username is already taken');
+      if (fnError) {
+        let msg = 'Could not update username.';
+        try {
+          const body = await (fnError as any).context?.json?.();
+          msg = body?.error ?? fnError.message ?? msg;
+        } catch {
+          msg = fnError.message ?? msg;
+        }
+        Alert.alert('Error', msg);
         return;
       }
 
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('profiles')
-        .update({ username: trimmed, username_updated_at: now })
-        .eq('user_id', session.user.id);
-
-      if (error) {
-        Alert.alert('Error', error.message);
-        return;
-      }
-
+      const now = data.updatedAt ?? new Date().toISOString();
       setProfile({ ...profile, username: trimmed, usernameUpdatedAt: now });
       setIsEditingUsername(false);
       posthog.capture('username_changed');

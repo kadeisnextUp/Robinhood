@@ -9,12 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables');
 }
 
+// skip persistent storage in that environment.
+const isSsr = typeof window === 'undefined';
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // ensure users stay logged in across app restarts and token refreshes
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage: isSsr ? undefined : AsyncStorage,
+    autoRefreshToken: !isSsr,
+    persistSession: !isSsr,
     detectSessionInUrl: false,
+    flowType: 'implicit',
   },
 });
