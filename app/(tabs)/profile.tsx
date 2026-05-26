@@ -2,6 +2,7 @@ import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Link, router } from 'expo-router';
+import { usePostHog } from 'posthog-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,7 +21,6 @@ import {
 import { useAuth } from '../../contexts/authContext';
 import { supabase } from '../../services/supabase';
 import { isProfane } from '../../src/utils/profanity';
-import { usePostHog } from 'posthog-react-native';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 const COOLDOWN_DAYS = 5;
@@ -239,7 +239,6 @@ export default function ProfileScreen() {
   if (!session) {
     return (
       <View style={styles.container}>
-        <View style={styles.banner} />
         <View style={[styles.centerContent, { flex: 1, paddingTop: spacing.xxl }]}>
           <Ionicons name="person-circle-outline" size={96} color={colors.primaryLight} />
           <Text style={styles.notLoggedInTitle}>Not Logged In</Text>
@@ -482,12 +481,12 @@ const styles = StyleSheet.create({
   },
   adminChipText: {
     color: colors.cardBackground,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
   },
   settingsBtn: {
-    padding: spacing.xs,
+    padding: spacing.sm,
   },
 
   avatarWrapper: {
