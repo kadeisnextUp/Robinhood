@@ -2,6 +2,7 @@ import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
+import { usePostHog } from 'posthog-react-native';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -14,7 +15,6 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/authContext';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
-import { usePostHog } from 'posthog-react-native';
 
 type VotingPeriod = { id: string; start_date: string; end_date: string };
 
@@ -325,10 +325,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   heroEyebrow: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.md,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
-    color: colors.cardBackground,
+    color: colors.secondary,
     letterSpacing: 4,
     marginBottom: spacing.sm,
     opacity: 0.85,
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   countdownText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.md,
     fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
     color: colors.white,

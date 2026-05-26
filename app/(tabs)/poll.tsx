@@ -1,5 +1,6 @@
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
+import { usePostHog } from 'posthog-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +11,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { usePostHog } from 'posthog-react-native';
 
 
 const CARD_BG = '#170F05';
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
-    color: colors.primaryLight,
+    color: colors.secondary,
     letterSpacing: 8,
     marginBottom: spacing.xs,
   },
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: '900',
-    color: colors.white,
+    color: colors.secondary,
     letterSpacing: 5,
   },
   headerDivider: {
