@@ -45,7 +45,6 @@
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./eas-credentials.json",
         "track": "internal"
       },
       "ios": {
