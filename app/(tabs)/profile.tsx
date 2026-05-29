@@ -43,7 +43,7 @@ interface Profile {
   avatar: string;
   totalDonated: number;
   charitiesVoted: number;
-  recentDonations: Array<{ id: string; charity: string; amount: number; date: string }>;
+  recentDonations: Array<{ id: string; charity: string | null; amount: number; date: string }>;
   nominations: Nomination[];
 }
 
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
         .select(`id, amount, donated_at, charities (name)`)
         .eq('user_id', userId)
         .order('donated_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       const { data: nominationData } = await supabase
         .from('nominations')
@@ -143,7 +143,7 @@ export default function ProfileScreen() {
         charitiesVoted: totalVotes ?? 0,
         recentDonations: recentDonations?.map((d) => ({
           id: d.id,
-          charity: d.charities.name,
+          charity: (d.charities as any)?.name ?? null,
           amount: d.amount,
           date: new Date(d.donated_at).toLocaleDateString('en-US', {
             month: 'short',
@@ -363,7 +363,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>${profile.totalDonated.toFixed(0)}</Text>
+            <Text style={styles.statValue}>${profile.totalDonated.toFixed(2)}</Text>
             <Text style={styles.statLabel}>Donated</Text>
           </View>
           <View style={styles.statDivider} />
@@ -373,22 +373,37 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── Recent Donations ── */}
+        {/* ── Donation Impact ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Donations</Text>
+          <Text style={styles.sectionTitle}>Your Impact</Text>
           {profile.recentDonations.length > 0 ? (
             profile.recentDonations.map((donation) => (
               <View key={donation.id} style={styles.listCard}>
                 <View style={styles.listCardLeft}>
-                  <View style={styles.donationIconCircle}>
-                    <Ionicons name="heart" size={16} color={colors.white} />
+                  <View style={[styles.donationIconCircle, !donation.charity && styles.donationIconPending]}>
+                    <Ionicons
+                      name={donation.charity ? 'heart' : 'time-outline'}
+                      size={16}
+                      color={colors.white}
+                    />
                   </View>
                   <View style={styles.listCardText}>
-                    <Text style={styles.listCardTitle} numberOfLines={1}>{donation.charity}</Text>
-                    <Text style={styles.listCardSub}>{donation.date}</Text>
+                    {donation.charity ? (
+                      <>
+                        <Text style={styles.listCardTitle} numberOfLines={1}>{donation.charity}</Text>
+                        <Text style={styles.listCardSub}>{donation.date}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.listCardTitle}>Winner being tallied</Text>
+                        <Text style={styles.listCardSub}>{donation.date} · Vote still in progress</Text>
+                      </>
+                    )}
                   </View>
                 </View>
-                <Text style={styles.donationAmount}>${donation.amount.toFixed(2)}</Text>
+                <Text style={[styles.donationAmount, !donation.charity && styles.donationAmountPending]}>
+                  ${donation.amount.toFixed(2)}
+                </Text>
               </View>
             ))
           ) : (
@@ -663,6 +678,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_700Bold',
     fontWeight: typography.weights.bold,
     color: colors.success,
+  },
+  donationAmountPending: {
+    color: colors.grey,
+  },
+  donationIconPending: {
+    backgroundColor: colors.grey,
   },
 
   statusBadge: {

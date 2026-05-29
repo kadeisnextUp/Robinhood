@@ -75,6 +75,12 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
+      // backfill all donations for this period with the winning charity
+      await supabase
+        .from('user_donations')
+        .update({ charity_id: winner.charity_id })
+        .eq('voting_period_id', period.id);
+
       // fetch winner charity name and all profiles with tokens
       const [{ data: winnerCharity }, { data: allProfiles }, { data: winnerVoters }] = await Promise.all([
         supabase.from('charities').select('name').eq('id', winner.charity_id).single(),
