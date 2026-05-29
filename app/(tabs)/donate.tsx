@@ -1,36 +1,30 @@
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
-import { FunctionsHttpError } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import { usePostHog } from 'posthog-react-native';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useAuth } from '../../contexts/authContext';
 import { useRequireAuth } from '../../hooks/useRequiredAuth';
 
 type VotingPeriod = { id: string; start_date: string; end_date: string };
 
-const PRESET_AMOUNTS = ['5', '10', '25', '50'];
-
 export default function DonateScreen() {
-  const [donationAmount, setDonationAmount] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [userDonationAmount, setUserDonationAmount] = useState(0);
   const [weeklyPool, setWeeklyPool] = useState(0);
   const [votingPeriod, setVotingPeriod] = useState<VotingPeriod | null>(null);
   const [timeRemaining, setTimeRemaining] = useState('');
   const [donating, setDonating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { requireAuth, user } = useRequireAuth();
-  const { session } = useAuth();
   const posthog = usePostHog();
 
   useEffect(() => {
@@ -69,6 +63,12 @@ export default function DonateScreen() {
     return () => clearInterval(interval);
   }, [votingPeriod]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadResults();
+    setRefreshing(false);
+  };
+
   const loadResults = async () => {
     try {
       const { data: period, error: periodError } = await supabase
@@ -104,103 +104,31 @@ export default function DonateScreen() {
     }
   };
 
-  const handlePresetSelect = (amount: string) => {
-    setSelectedPreset(amount);
-    setDonationAmount(amount);
-  };
-
-  const handleCustomInput = (text: string) => {
-    setSelectedPreset(null);
-    setDonationAmount(text);
-  };
-
   const handleDirectDonate = async () => {
-    const amount = parseFloat(donationAmount);
-
-    if (isNaN(amount) || amount < 1.00) {
-      Alert.alert('Invalid Amount', 'Minimum donation is $1.00.');
-      return;
-    }
-
     requireAuth(async () => {
       try {
         setDonating(true);
         posthog.capture('donation_initiated', {
-          amount,
           voting_period_id: votingPeriod?.id ?? null,
-          amount_type: selectedPreset ? 'preset' : 'custom',
         });
 
-        const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-order', {
-          body: { amount: amount.toFixed(2), userId: user?.id },
-          headers: { Authorization: `Bearer ${session?.access_token}` },
-        });
-
-        if (sessionError) {
-          let errorMessage = 'Could not create PayPal order';
-          if (sessionError instanceof FunctionsHttpError) {
-            try {
-              const errorData = await sessionError.context.json();
-              errorMessage = errorData.error || errorMessage;
-            } catch {
-              errorMessage = sessionError.message || errorMessage;
-            }
-          } else {
-            errorMessage = sessionError?.message || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-
-        if (!sessionData?.approvalUrl) {
-          throw new Error('Could not create PayPal order');
-        }
+        const donationUrl =
+          `https://www.paypal.com/donate/?hosted_button_id=3EW92NUCZDTL6` +
+          `&custom=${encodeURIComponent(user?.id ?? '')}`;
 
         const result = await WebBrowser.openAuthSessionAsync(
-          sessionData.approvalUrl,
-          'fundit://donate/success'
+          donationUrl,
+          'fundit://'
         );
 
+        await loadResults();
+
         if (result.type === 'success') {
-          const { data: captureData, error: captureError } = await supabase.functions.invoke('capture-paypal-order', {
-            body: { orderId: sessionData.orderId },
-            headers: { Authorization: `Bearer ${session?.access_token}` },
-          });
-
-          if (captureError) {
-            let errorMessage = 'Payment capture failed';
-            if (captureError instanceof FunctionsHttpError) {
-              try {
-                const errorData = await captureError.context.json();
-                errorMessage = errorData.error || errorMessage;
-              } catch {
-                errorMessage = captureError.message || errorMessage;
-              }
-            } else {
-              errorMessage = captureError?.message || errorMessage;
-            }
-            throw new Error(errorMessage);
-          }
-
-          if (!captureData?.success) {
-            throw new Error('Payment was not completed');
-          }
-
-          posthog.capture('donation_completed', {
-            amount,
-            voting_period_id: sessionData.votingPeriodId ?? null,
-          });
-          setDonationAmount('');
-          setSelectedPreset(null);
-          await loadResults();
-
           Alert.alert(
             'Thank You!',
-            `Your donation of $${amount.toFixed(2)} has been added to this week's pool!`,
+            'Your donation is being processed and will appear in the pool within a few minutes.',
             [{ text: 'OK' }]
           );
-        } else if (result.type === 'cancel') {
-          posthog.capture('donation_cancelled', { amount });
-          Alert.alert('Donation Cancelled', 'Your donation was not completed.');
         }
       } catch (err) {
         console.error('Donation error:', err);
@@ -217,6 +145,14 @@ export default function DonateScreen() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
     >
       {/* hero */}
       <View style={styles.hero}>
@@ -236,7 +172,7 @@ export default function DonateScreen() {
       {/* user contribution banner */}
       {userDonationAmount > 0 && (
         <View style={styles.contributionBanner}>
-          <View style={styles.contributionDot} />
+          <Text style={styles.contributionEmoji}>💵</Text>
           <Text style={styles.contributionText}>
             You've contributed{' '}
             <Text style={styles.contributionAmount}>${userDonationAmount.toFixed(2)}</Text>
@@ -245,64 +181,22 @@ export default function DonateScreen() {
         </View>
       )}
 
-      {/* donation form card */}
+      {/* donation card */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Make a Donation</Text>
         <Text style={styles.cardSubtitle}>
-          Choose an amount or enter your own. Minimum $1.00.
+          You'll choose your amount securely on PayPal's page. Every dollar goes to this week's winning charity.
         </Text>
 
-        {/* preset amounts */}
-        <View style={styles.presetRow}>
-          {PRESET_AMOUNTS.map((amount) => (
-            <TouchableOpacity
-              key={amount}
-              style={[
-                styles.presetBtn,
-                selectedPreset === amount && styles.presetBtnActive,
-              ]}
-              onPress={() => handlePresetSelect(amount)}
-              disabled={donating}
-            >
-              <Text
-                style={[
-                  styles.presetBtnText,
-                  selectedPreset === amount && styles.presetBtnTextActive,
-                ]}
-              >
-                ${amount}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* custom amount input */}
-        <View style={styles.inputWrapper}>
-          <Text style={styles.dollarSign}>$</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Other amount"
-            placeholderTextColor={colors.grey}
-            keyboardType="decimal-pad"
-            value={donationAmount}
-            onChangeText={handleCustomInput}
-            editable={!donating}
-            returnKeyType="done"
-            onSubmitEditing={handleDirectDonate}
-          />
-        </View>
-
-        {/* donate button */}
         <TouchableOpacity
           style={[styles.donateBtn, donating && styles.donateBtnDisabled]}
           onPress={handleDirectDonate}
           disabled={donating}
         >
           <Text style={styles.donateBtnText}>
-            {donating ? 'Processing...' : 'Donate with PayPal'}
+            {donating ? 'Opening PayPal...' : 'Donate with PayPal'}
           </Text>
         </TouchableOpacity>
-
       </View>
     </ScrollView>
   );
@@ -387,11 +281,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.sm,
   },
-  contributionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.success,
+  contributionEmoji: {
+    fontSize: 18,
   },
   contributionText: {
     fontSize: typography.sizes.sm,
@@ -430,66 +321,11 @@ const styles = StyleSheet.create({
     lineHeight: typography.sizes.sm * 1.6,
   },
 
-  presetRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  presetBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-    backgroundColor: colors.white,
-  },
-  presetBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  presetBtnText: {
-    fontSize: typography.sizes.body,
-    fontFamily: 'Fredoka_600SemiBold',
-    fontWeight: typography.weights.semiBold,
-    color: colors.textLight,
-  },
-  presetBtnTextActive: {
-    color: colors.white,
-  },
-
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    backgroundColor: colors.white,
-  },
-  dollarSign: {
-    fontSize: typography.sizes.xl,
-    fontFamily: 'Fredoka_700Bold',
-    fontWeight: typography.weights.bold,
-    color: colors.primary,
-    marginRight: spacing.xs,
-  },
-  input: {
-    flex: 1,
-    fontSize: typography.sizes.xl,
-    fontFamily: 'Fredoka_600SemiBold',
-    fontWeight: typography.weights.semiBold,
-    paddingVertical: 14,
-    color: colors.text,
-  },
-
   donateBtn: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginBottom: spacing.md,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -505,14 +341,5 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.white,
     letterSpacing: 0.3,
-  },
-
-  trustLine: {
-    fontSize: typography.sizes.xs,
-    fontFamily: 'Fredoka_400Regular',
-    color: colors.textLight,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-    opacity: 0.8,
   },
 });
