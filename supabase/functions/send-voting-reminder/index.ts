@@ -30,33 +30,40 @@ Deno.serve(async (_req) => {
 
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('expo_push_token')
+      .select('user_id, expo_push_token')
       .not('expo_push_token', 'is', null);
 
-    const tokens = (profiles ?? [])
-      .map((p: any) => p.expo_push_token)
-      .filter((t: string) => t?.startsWith('ExponentPushToken['));
+    const validProfiles = (profiles ?? []).filter((p: any) =>
+      p.expo_push_token?.startsWith('ExponentPushToken[')
+    );
 
-    if (tokens.length === 0) {
+    if (validProfiles.length === 0) {
       return new Response(
         JSON.stringify({ success: true, message: 'No tokens to notify' }),
         { headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    const userIds = validProfiles.map((p: any) => p.user_id);
+    const { data: updatedCounts } = await supabase.rpc('increment_notification_count', {
+      user_ids: userIds,
+    });
+    const countMap = new Map((updatedCounts ?? []).map((r: any) => [r.user_id, r.new_count]));
+
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(tokens.map((token: string) => ({
-        to: token,
+      body: JSON.stringify(validProfiles.map((p: any) => ({
+        to: p.expo_push_token,
         title: 'Last Chance to Vote!',
         body: 'Voting closes in about 8 hours. Make your vote count!',
+        badge: countMap.get(p.user_id) ?? 1,
         data: { type: 'voting_reminder' },
       }))),
     });
 
     return new Response(
-      JSON.stringify({ success: true, notified: tokens.length }),
+      JSON.stringify({ success: true, notified: validProfiles.length }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {

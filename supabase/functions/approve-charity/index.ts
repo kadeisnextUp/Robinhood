@@ -107,19 +107,26 @@ Deno.serve(async (req) => {
 
     const { data: profiles } = await supabaseAdmin
       .from("profiles")
-      .select("expo_push_token")
+      .select("user_id, expo_push_token")
       .in("user_id", userIds)
       .not("expo_push_token", "is", null);
 
-    const tokens = (profiles ?? [])
-      .map((p: any) => p.expo_push_token)
-      .filter((t: string) => t?.startsWith("ExponentPushToken["));
+    const validProfiles = (profiles ?? []).filter((p: any) =>
+      p.expo_push_token?.startsWith("ExponentPushToken[")
+    );
 
-    if (tokens.length > 0) {
-      const messages = tokens.map((token: string) => ({
-        to: token,
+    if (validProfiles.length > 0) {
+      const recipientIds = validProfiles.map((p: any) => p.user_id);
+      const { data: updatedCounts } = await supabaseAdmin.rpc("increment_notification_count", {
+        user_ids: recipientIds,
+      });
+      const countMap = new Map((updatedCounts ?? []).map((r: any) => [r.user_id, r.new_count]));
+
+      const messages = validProfiles.map((p: any) => ({
+        to: p.expo_push_token,
         title: "Nomination Approved!",
         body: `${charity.name} has been approved and is now eligible for voting.`,
+        badge: countMap.get(p.user_id) ?? 1,
         data: { type: "nomination_update", status: "approved", charity_id },
       }));
 

@@ -7,7 +7,6 @@ Deno.serve(async (_req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // only run if there's an active voting period
     const { data: activePeriod, error: periodError } = await supabase
       .from('voting_periods')
       .select('id')
@@ -23,7 +22,6 @@ Deno.serve(async (_req) => {
       );
     }
 
-    // get all users who have already voted this period
     const { data: voters } = await supabase
       .from('votes')
       .select('user_id')
@@ -31,36 +29,42 @@ Deno.serve(async (_req) => {
 
     const voterIds = new Set((voters ?? []).map((v: any) => v.user_id));
 
-    // get all users with push tokens who haven't voted yet
     const { data: profiles } = await supabase
       .from('profiles')
       .select('user_id, expo_push_token')
       .not('expo_push_token', 'is', null);
 
-    const tokens = (profiles ?? [])
-      .filter((p: any) => !voterIds.has(p.user_id) && p.expo_push_token?.startsWith('ExponentPushToken['))
-      .map((p: any) => p.expo_push_token);
+    const validProfiles = (profiles ?? []).filter((p: any) =>
+      !voterIds.has(p.user_id) && p.expo_push_token?.startsWith('ExponentPushToken[')
+    );
 
-    if (tokens.length === 0) {
+    if (validProfiles.length === 0) {
       return new Response(
         JSON.stringify({ success: true, message: 'All users have already voted' }),
         { headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    const userIds = validProfiles.map((p: any) => p.user_id);
+    const { data: updatedCounts } = await supabase.rpc('increment_notification_count', {
+      user_ids: userIds,
+    });
+    const countMap = new Map((updatedCounts ?? []).map((r: any) => [r.user_id, r.new_count]));
+
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(tokens.map((token: string) => ({
-        to: token,
+      body: JSON.stringify(validProfiles.map((p: any) => ({
+        to: p.expo_push_token,
         title: "Don't forget to vote!",
         body: "You haven't voted yet this week. Pick your charity before voting closes!",
+        badge: countMap.get(p.user_id) ?? 1,
         data: { type: 'midweek_reminder', voting_period_id: activePeriod.id },
       }))),
     });
 
     return new Response(
-      JSON.stringify({ success: true, notified: tokens.length }),
+      JSON.stringify({ success: true, notified: validProfiles.length }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {

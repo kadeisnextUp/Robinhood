@@ -126,6 +126,11 @@ Deno.serve(async (req) => {
       .single();
 
     if (userProfile?.expo_push_token?.startsWith('ExponentPushToken[')) {
+      const { data: updatedCounts } = await supabase.rpc('increment_notification_count', {
+        user_ids: [userId],
+      });
+      const newCount = updatedCounts?.[0]?.new_count ?? 1;
+
       await fetch('https://exp.host/--/api/v2/push/send', {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -133,6 +138,7 @@ Deno.serve(async (req) => {
           to: userProfile.expo_push_token,
           title: 'Donation Confirmed!',
           body: `Your $${amount.toFixed(2)} donation has been received. Thank you!`,
+          badge: newCount,
           data: { type: 'donation_confirmed', transaction_id: transactionId, amount },
         }),
       });
