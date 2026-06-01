@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/authContext';
 import { supabase } from '../services/supabase';
@@ -9,7 +9,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
     shouldShowBanner: true,
     shouldShowList: true,
   }),
@@ -21,7 +21,26 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!session) return;
     registerForPushNotifications();
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        clearBadge(session.user.id);
+      }
+    });
+
+    // clear on initial mount (app opened from cold start via notification)
+    clearBadge(session.user.id);
+
+    return () => subscription.remove();
   }, [session]);
+}
+
+async function clearBadge(userId: string) {
+  await Notifications.setBadgeCountAsync(0);
+  await supabase
+    .from('profiles')
+    .update({ unread_notification_count: 0 })
+    .eq('user_id', userId);
 }
 
 async function registerForPushNotifications() {

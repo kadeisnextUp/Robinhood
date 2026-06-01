@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
 
     let expiredPeriods;
     if (force && forcePeriodId) {
-      // admin manually closing a specific period
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -25,7 +24,6 @@ Deno.serve(async (req) => {
       if (error) throw error;
       expiredPeriods = data;
     } else {
-      // scheduled: close any period whose end_date has passed
       const { data, error } = await supabase
         .from('voting_periods')
         .select('id')
@@ -75,46 +73,41 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
-      // backfill all donations for this period with the winning charity
       await supabase
         .from('user_donations')
         .update({ charity_id: winner.charity_id })
         .eq('voting_period_id', period.id);
 
-      // fetch winner charity name and all profiles with tokens
       const [{ data: winnerCharity }, { data: allProfiles }, { data: winnerVoters }] = await Promise.all([
         supabase.from('charities').select('name').eq('id', winner.charity_id).single(),
         supabase.from('profiles').select('user_id, expo_push_token').not('expo_push_token', 'is', null),
         supabase.from('votes').select('user_id').eq('voting_period_id', period.id).eq('charity_id', winner.charity_id),
       ]);
 
+      const validProfiles = (allProfiles ?? []).filter((p: any) =>
+        p.expo_push_token?.startsWith('ExponentPushToken[')
+      );
+      const allUserIds = validProfiles.map((p: any) => p.user_id);
+
+      // increment badge counts for all recipients and get their new counts
+      const { data: updatedCounts } = await supabase.rpc('increment_notification_count', {
+        user_ids: allUserIds,
+      });
+      const countMap = new Map((updatedCounts ?? []).map((r: any) => [r.user_id, r.new_count]));
+
       const winnerVoterIds = new Set((winnerVoters ?? []).map((v: any) => v.user_id));
       const charityName = winnerCharity?.name ?? 'A charity';
       const notifData = { type: 'winner_announced', period_id: period.id, winner_charity_id: winner.charity_id };
 
-      const pickedTokens: string[] = [];
-      const broadcastTokens: string[] = [];
-      for (const p of (allProfiles ?? [])) {
-        const token = p.expo_push_token;
-        if (!token?.startsWith('ExponentPushToken[')) continue;
-        if (winnerVoterIds.has(p.user_id)) pickedTokens.push(token);
-        else broadcastTokens.push(token);
-      }
-
-      const pushMessages = [
-        ...pickedTokens.map((token: string) => ({
-          to: token,
-          title: 'Your pick won!',
-          body: `${charityName} won this week's vote. Great call!`,
-          data: notifData,
-        })),
-        ...broadcastTokens.map((token: string) => ({
-          to: token,
-          title: 'Winner Announced!',
-          body: `${charityName} won this week's vote!`,
-          data: notifData,
-        })),
-      ];
+      const pushMessages = validProfiles.map((p: any) => ({
+        to: p.expo_push_token,
+        title: winnerVoterIds.has(p.user_id) ? 'Your pick won!' : 'Winner Announced!',
+        body: winnerVoterIds.has(p.user_id)
+          ? `${charityName} won this week's vote. Great call!`
+          : `${charityName} won this week's vote!`,
+        badge: countMap.get(p.user_id) ?? 1,
+        data: notifData,
+      }));
 
       if (pushMessages.length > 0) {
         await fetch('https://exp.host/--/api/v2/push/send', {
@@ -142,19 +135,16 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
-        // calculate next Monday midnight UTC
         const nextStart = new Date();
-        const dayOfWeek = nextStart.getUTCDay(); // 0 = Sunday
+        const dayOfWeek = nextStart.getUTCDay();
         const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
         nextStart.setUTCDate(nextStart.getUTCDate() + daysToMonday);
         nextStart.setUTCHours(0, 0, 0, 0);
 
-        // end: following Sunday 23:55 UTC
         const nextEnd = new Date(nextStart);
         nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
         nextEnd.setUTCHours(23, 55, 0, 0);
 
-        // exclude charities from the last 3 periods
         const { data: recentPeriods } = await supabase
           .from('voting_periods')
           .select('id')
@@ -202,20 +192,26 @@ Deno.serve(async (req) => {
               supabase.from('nominations').select('user_id, charity_id, charities(name)').in('charity_id', selectedIds).eq('status', 'approved'),
             ]);
 
-            const validProfiles = (newPeriodProfiles ?? []).filter((p: any) =>
+            const validNewProfiles = (newPeriodProfiles ?? []).filter((p: any) =>
               p.expo_push_token?.startsWith('ExponentPushToken[')
             );
+            const newPeriodUserIds = validNewProfiles.map((p: any) => p.user_id);
 
-            // broadcast new period to all users
-            const broadcastMsgs = validProfiles.map((p: any) => ({
+            const { data: newCounts } = await supabase.rpc('increment_notification_count', {
+              user_ids: newPeriodUserIds,
+            });
+            const newCountMap = new Map((newCounts ?? []).map((r: any) => [r.user_id, r.new_count]));
+
+            const profileTokenMap = new Map(validNewProfiles.map((p: any) => [p.user_id, p.expo_push_token]));
+
+            const broadcastMsgs = validNewProfiles.map((p: any) => ({
               to: p.expo_push_token,
               title: 'New Vote Is Open!',
               body: "This week's 5 charities are ready. Cast your vote now!",
+              badge: newCountMap.get(p.user_id) ?? 1,
               data: { type: 'new_voting_period', voting_period_id: newPeriod.id },
             }));
 
-            // personalized message to nominators whose charity was selected
-            const profileTokenMap = new Map((newPeriodProfiles ?? []).map((p: any) => [p.user_id, p.expo_push_token]));
             const nominatorMsgs = (nominatorRows ?? [])
               .map((n: any) => {
                 const token = profileTokenMap.get(n.user_id);
@@ -225,6 +221,7 @@ Deno.serve(async (req) => {
                   to: token,
                   title: "Your charity is in this week's vote!",
                   body: `${charityName} was selected for this week's voting round. Go vote!`,
+                  badge: newCountMap.get(n.user_id) ?? 1,
                   data: { type: 'charity_selected', charity_id: n.charity_id, voting_period_id: newPeriod.id },
                 };
               })
