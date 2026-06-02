@@ -61,11 +61,11 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 - [x] Admin tools for weekly management
 
 ### Month 5: Polish & Launch
-- [ ] UI/UX improvements
+- [x] UI/UX improvements
 - [ ] Testing (unit, integration, user)
 - [ ] App Store submission (iOS)
 - [ ] Google Play submission (Android)
-- [ ] Privacy policy & terms of service
+- [x] Privacy policy & terms of service
 
 
 ## Key Features & Rules
@@ -84,7 +84,7 @@ Fund-It allows users to vote weekly on their favorite charities from a rotating 
 ### Voting Rules
 - One vote per user per week
 - Must create an account in order to vote
-- Voting period: 7 days (week-long rounds) Monday - Sunday @ 11:55 PM
+- Voting period: 7 days (week-long rounds) Monday - Sunday @ 7:55 PM EST
 
 ### Donation Methods
 - Direct donations: Optional monetary contributions
