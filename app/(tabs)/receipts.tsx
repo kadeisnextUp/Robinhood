@@ -1,9 +1,10 @@
 import CardSwap, { Card } from '@/src/components/CardSwap';
 import ReceiptCard from '@/src/components/ReceiptCard';
 import { colors, spacing } from '@/src/theme';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { usePostHog } from 'posthog-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 
@@ -13,8 +14,8 @@ export default function DonationReceiptsScreen() {
   const insets = useSafeAreaInsets();
 
   // available vertical space: subtract paddingTop, header, footer, safe area bottom, tab bar
-  const CARD_AREA_HEIGHT = SCREEN_HEIGHT - 60 - 100 - insets.bottom - 49;
-  const CARD_HEIGHT = Math.min(520, Math.max(360, CARD_AREA_HEIGHT));
+  const CARD_AREA_HEIGHT = SCREEN_HEIGHT - 60 - 160 - insets.bottom - 49;
+  const CARD_HEIGHT = Math.min(500, Math.max(340, CARD_AREA_HEIGHT));
 
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,12 @@ export default function DonationReceiptsScreen() {
   useEffect(() => {
     loadReceipts();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadReceipts();
+    }, [])
+  );
 
   const loadReceipts = async () => {
     try {
@@ -87,7 +94,8 @@ export default function DonationReceiptsScreen() {
             }),
             votes: winnerVotes ?? 0,
             percentage,
-            transactionId: donation.transaction_id || donation.proof_url || 'N/A',
+            transactionId: donation.transaction_id || 'N/A',
+            proofUrl: donation.proof_url || null,
           };
         })
       );
@@ -102,8 +110,19 @@ export default function DonationReceiptsScreen() {
     }
   };
 
+  const lastTap = useRef<{ index: number; time: number } | null>(null);
+
   const handleCardClick = (index: number) => {
-    console.log(`Clicked on receipt ${index}`);
+    const now = Date.now();
+    if (lastTap.current?.index === index && now - lastTap.current.time < 300) {
+      lastTap.current = null;
+      const receipt = receipts[index];
+      if (receipt?.transactionId && receipt.transactionId !== 'N/A') {
+        Linking.openURL(`https://www.paypal.com/activity/payment/${receipt.transactionId}`);
+      }
+    } else {
+      lastTap.current = { index, time: now };
+    }
   };
 
   if (loading) {
@@ -146,7 +165,7 @@ export default function DonationReceiptsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Past Donations</Text>
         <Text style={styles.subtitle}>
-          Swipe left and view each receipt to go through our donation history
+          Double-tap a card to view the PayPal receipt or swipe to browse the history of Fund-It
         </Text>
       </View>
 
@@ -202,7 +221,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_400Regular',
     color: colors.white,
     textAlign: 'center',
-    marginBottom: -20,
+    marginBottom: 16,
   },
   cardSwapWrapper: {
     alignItems: 'center',
