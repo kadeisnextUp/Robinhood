@@ -74,14 +74,14 @@ const ReceiptCard: React.FC<ReceiptCardProps> = ({
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Payment Method</Text>
-          <Text style={styles.detailValue}>Pooled Funds</Text>
+          <Text style={styles.detailValue}>PayPal</Text>
         </View>
       </View>
 
       {/* bottom Banner */}
       <View style={styles.bottomBanner}>
         <Text style={styles.bannerText}>
-          Thank you for making a difference! 💚
+          Thank you for making a difference! 
         </Text>
       </View>
     </View>
@@ -97,35 +97,35 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: colors.primary,
-    paddingVertical: 30,
+    paddingVertical: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
   appName: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: '700',
     color: colors.white,
-    marginBottom: 16,
+    marginBottom: 10,
     letterSpacing: spacing.xs,
   },
   checkmarkCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.cardBackground,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   checkmark: {
-    fontSize: 36,
+    fontSize: 26,
     fontFamily: 'Fredoka_700Bold',
     color: colors.primary,
     fontWeight: 'bold',
   },
   confirmed: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Fredoka_600SemiBold',
     fontWeight: '600',
     color: colors.primaryLight,
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   content: {
-    padding: 24,
+    padding: 14,
     alignItems: 'center',
   },
   label: {
@@ -146,34 +146,34 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
     letterSpacing: 1,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   charityName: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.text,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   amountBox: {
     backgroundColor: colors.white,
     borderRadius: 12,
-    padding: 20,
+    padding: 10,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: colors.border,
   },
   amountLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
-    marginBottom: 6,
+    marginBottom: 2,
   },
   amount: {
-    fontSize: 42,
+    fontSize: 34,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.primary,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: colors.white,
     borderRadius: 12,
-    padding: 16,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'space-around',
     borderWidth: 1,
@@ -195,26 +195,26 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 32,
     backgroundColor: colors.border,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Fredoka_700Bold',
     fontWeight: 'bold',
     color: colors.primary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Fredoka_400Regular',
     color: colors.textLight,
   },
   footer: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: colors.divider,
-    gap: 12,
+    gap: 6,
   },
   detailRow: {
     flexDirection: 'row',
@@ -241,8 +241,9 @@ const styles = StyleSheet.create({
   },
   bottomBanner: {
     backgroundColor: colors.primary,
-    paddingVertical: 16,
+    paddingVertical: 10,
     alignItems: 'center',
+    marginTop: 'auto',
   },
   bannerText: {
     fontSize: 13,

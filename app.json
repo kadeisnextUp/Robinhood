@@ -51,6 +51,12 @@
       "expo-image",
       "expo-localization",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fund-It needs access to your photos to upload PayPal donation screenshots."
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",

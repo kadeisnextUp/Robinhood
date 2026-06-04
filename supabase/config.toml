@@ -40,6 +40,12 @@ entrypoint = "./functions/create-voting-period/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/create-voting-period/*.html" ]
 
+[functions.record-donation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/record-donation/deno.json"
+entrypoint = "./functions/record-donation/index.ts"
+
 [functions.close-voting-period]
 enabled = true
 verify_jwt = true

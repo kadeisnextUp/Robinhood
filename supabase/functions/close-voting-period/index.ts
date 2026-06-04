@@ -135,12 +135,15 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
+        // open Monday 05:00 UTC = midnight EST / 1 AM EDT
+        // gives admin ~5 hours after Sunday close to record and send the donation
         const nextStart = new Date();
         const dayOfWeek = nextStart.getUTCDay();
         const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
         nextStart.setUTCDate(nextStart.getUTCDate() + daysToMonday);
-        nextStart.setUTCHours(0, 0, 0, 0);
+        nextStart.setUTCHours(5, 0, 0, 0);
 
+        // end: following Sunday 23:55 UTC (~7 PM EST / 8 PM EDT)
         const nextEnd = new Date(nextStart);
         nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
         nextEnd.setUTCHours(23, 55, 0, 0);
