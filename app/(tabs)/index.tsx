@@ -294,7 +294,7 @@ export default function HomeScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="Search charities by name or EIN..."
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.primaryDark}
           returnKeyType="search"
           onSubmitEditing={handleSearch}
           autoCapitalize="none"

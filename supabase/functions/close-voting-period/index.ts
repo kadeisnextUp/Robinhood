@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     }
 
     // when running on schedule (not admin force-close), automatically create next week's period.
-    // the new period starts next Monday 00:00 UTC so the 5-minute dead phase (Sun 23:55–Mon 00:00) is preserved.
+    // the new period starts next Monday 05:00 UTC so the 5-hour dead phase (Sun 23:55–Mon 05:00) is preserved.
     let nextPeriodId: string | null = null;
     if (!force) {
       const { data: existing } = await supabase

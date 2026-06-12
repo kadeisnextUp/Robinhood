@@ -43,7 +43,7 @@ interface Profile {
   avatar: string;
   totalDonated: number;
   charitiesVoted: number;
-  recentDonations: Array<{ id: string; charity: string | null; amount: number; date: string }>;
+  recentDonations: Array<{ id: string; charity: string | null; logoUrl: string | null; amount: number; date: string }>;
   nominations: Nomination[];
 }
 
@@ -52,6 +52,61 @@ const STATUS_COLORS = {
   rejected: colors.error,
   pending: colors.grey,
 };
+
+const CHARITY_TILE_COLORS = [
+  '#C0714A', '#5B8A6B', '#4A7A8A', '#8A6B40',
+  '#6B4A8A', '#4A8A6B', '#8A4A5B', '#5B7A4A',
+];
+
+const getCharityColor = (name: string): string => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CHARITY_TILE_COLORS[Math.abs(hash) % CHARITY_TILE_COLORS.length];
+};
+
+function CharityLogo({ logoUrl, name }: { logoUrl: string | null; name: string }) {
+  const [imgError, setImgError] = useState(false);
+  const bg = getCharityColor(name);
+  const initial = name.trim().charAt(0).toUpperCase();
+
+  return (
+    <View style={[charityLogoStyles.tile, { backgroundColor: bg }]}>
+      {logoUrl && !imgError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={charityLogoStyles.img}
+          resizeMode="contain"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <Text style={charityLogoStyles.initial}>{initial}</Text>
+      )}
+    </View>
+  );
+}
+
+const charityLogoStyles = StyleSheet.create({
+  tile: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    padding: 6,
+  },
+  img: {
+    width: '100%',
+    height: '100%',
+  },
+  initial: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: 'Fredoka_700Bold',
+  },
+});
 
 export default function ProfileScreen() {
   const posthog = usePostHog();
@@ -120,10 +175,24 @@ export default function ProfileScreen() {
 
       const { data: recentDonations } = await supabase
         .from('user_donations')
-        .select(`id, amount, donated_at, charities (name)`)
+        .select('id, amount, donated_at, voting_period_id')
         .eq('user_id', userId)
         .order('donated_at', { ascending: false })
         .limit(10);
+
+      const periodIds = recentDonations?.map((d) => d.voting_period_id).filter(Boolean) ?? [];
+      const { data: periods } = periodIds.length
+        ? await supabase
+            .from('voting_periods')
+            .select('id, charities (name, logo_url)')
+            .in('id', periodIds)
+        : { data: [] };
+      const periodCharityMap: Record<string, { name: string | null; logoUrl: string | null }> = Object.fromEntries(
+        periods?.map((p) => [
+          p.id,
+          { name: (p.charities as any)?.name ?? null, logoUrl: (p.charities as any)?.logo_url ?? null },
+        ]) ?? []
+      );
 
       const { data: nominationData } = await supabase
         .from('nominations')
@@ -143,7 +212,8 @@ export default function ProfileScreen() {
         charitiesVoted: totalVotes ?? 0,
         recentDonations: recentDonations?.map((d) => ({
           id: d.id,
-          charity: (d.charities as any)?.name ?? null,
+          charity: periodCharityMap[d.voting_period_id]?.name ?? null,
+          logoUrl: periodCharityMap[d.voting_period_id]?.logoUrl ?? null,
           amount: d.amount,
           date: new Date(d.donated_at).toLocaleDateString('en-US', {
             month: 'short',
@@ -289,13 +359,13 @@ export default function ProfileScreen() {
         <View style={styles.bannerActions}>
           {profile.isAdmin && (
             <TouchableOpacity style={styles.adminChip} onPress={() => router.push('/admin')}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={colors.cardBackground} />
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.cardBackground} />
               <Text style={styles.adminChipText}>Admin</Text>
             </TouchableOpacity>
           )}
           <Link href="/settings" asChild>
             <TouchableOpacity style={styles.settingsBtn}>
-              <Ionicons name="settings-outline" size={22} color={colors.cardBackground} />
+              <Ionicons name="settings-outline" size={32} color={colors.cardBackground} />
             </TouchableOpacity>
           </Link>
         </View>
@@ -377,35 +447,37 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Impact</Text>
           {profile.recentDonations.length > 0 ? (
-            profile.recentDonations.map((donation) => (
-              <View key={donation.id} style={styles.listCard}>
-                <View style={styles.listCardLeft}>
-                  <View style={[styles.donationIconCircle, !donation.charity && styles.donationIconPending]}>
-                    <Ionicons
-                      name={donation.charity ? 'heart' : 'time-outline'}
-                      size={16}
-                      color={colors.white}
-                    />
-                  </View>
-                  <View style={styles.listCardText}>
+            <ScrollView style={styles.sectionList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {profile.recentDonations.map((donation) => (
+                <View key={donation.id} style={styles.listCard}>
+                  <View style={styles.listCardLeft}>
                     {donation.charity ? (
-                      <>
-                        <Text style={styles.listCardTitle} numberOfLines={1}>{donation.charity}</Text>
-                        <Text style={styles.listCardSub}>{donation.date}</Text>
-                      </>
+                      <CharityLogo logoUrl={donation.logoUrl} name={donation.charity} />
                     ) : (
-                      <>
-                        <Text style={styles.listCardTitle}>Winner being tallied</Text>
-                        <Text style={styles.listCardSub}>{donation.date} · Vote still in progress</Text>
-                      </>
+                      <View style={[styles.donationIconCircle, styles.donationIconPending]}>
+                        <Ionicons name="time-outline" size={16} color={colors.white} />
+                      </View>
                     )}
+                    <View style={styles.listCardText}>
+                      {donation.charity ? (
+                        <>
+                          <Text style={styles.listCardTitle} numberOfLines={1}>{donation.charity}</Text>
+                          <Text style={styles.listCardSub}>{donation.date}</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.listCardTitle}>Winner being tallied</Text>
+                          <Text style={styles.listCardSub}>{donation.date} · Vote still in progress</Text>
+                        </>
+                      )}
+                    </View>
                   </View>
+                  <Text style={[styles.donationAmount, !donation.charity && styles.donationAmountPending]}>
+                    ${donation.amount.toFixed(2)}
+                  </Text>
                 </View>
-                <Text style={[styles.donationAmount, !donation.charity && styles.donationAmountPending]}>
-                  ${donation.amount.toFixed(2)}
-                </Text>
-              </View>
-            ))
+              ))}
+            </ScrollView>
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="heart-outline" size={32} color={colors.primaryLight} />
@@ -418,34 +490,36 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Nominations</Text>
           {profile.nominations.length > 0 ? (
-            profile.nominations.map((nom) => (
-              <View key={nom.id} style={styles.listCard}>
-                <View style={styles.listCardLeft}>
-                  <View style={[styles.donationIconCircle, { backgroundColor: STATUS_COLORS[nom.status] }]}>
-                    <Ionicons
-                      name={
-                        nom.status === 'approved'
-                          ? 'checkmark'
-                          : nom.status === 'rejected'
-                          ? 'close'
-                          : 'time-outline'
-                      }
-                      size={16}
-                      color={colors.white}
-                    />
+            <ScrollView style={styles.sectionList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {profile.nominations.map((nom) => (
+                <View key={nom.id} style={styles.listCard}>
+                  <View style={styles.listCardLeft}>
+                    <View style={[styles.donationIconCircle, { backgroundColor: STATUS_COLORS[nom.status] }]}>
+                      <Ionicons
+                        name={
+                          nom.status === 'approved'
+                            ? 'checkmark'
+                            : nom.status === 'rejected'
+                            ? 'close'
+                            : 'time-outline'
+                        }
+                        size={16}
+                        color={colors.white}
+                      />
+                    </View>
+                    <View style={styles.listCardText}>
+                      <Text style={styles.listCardTitle} numberOfLines={1}>{nom.charityName}</Text>
+                      <Text style={styles.listCardSub}>{nom.ein ? `EIN: ${nom.ein}  ·  ` : ''}{nom.date}</Text>
+                    </View>
                   </View>
-                  <View style={styles.listCardText}>
-                    <Text style={styles.listCardTitle} numberOfLines={1}>{nom.charityName}</Text>
-                    <Text style={styles.listCardSub}>{nom.ein ? `EIN: ${nom.ein}  ·  ` : ''}{nom.date}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[nom.status] }]}>
+                    <Text style={styles.statusText}>
+                      {nom.status.charAt(0).toUpperCase() + nom.status.slice(1)}
+                    </Text>
                   </View>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[nom.status] }]}>
-                  <Text style={styles.statusText}>
-                    {nom.status.charAt(0).toUpperCase() + nom.status.slice(1)}
-                  </Text>
-                </View>
-              </View>
-            ))
+              ))}
+            </ScrollView>
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="clipboard-outline" size={32} color={colors.primaryLight} />
@@ -621,6 +695,9 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xl,
   },
+  sectionList: {
+    maxHeight: 340,
+  },
   sectionTitle: {
     fontSize: typography.sizes.lg,
     fontFamily: 'Fredoka_700Bold',
@@ -649,6 +726,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginRight: spacing.sm,
+  },
+  donationLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
   },
   donationIconCircle: {
     width: 36,
