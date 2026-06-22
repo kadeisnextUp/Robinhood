@@ -5,6 +5,7 @@ import {
   Fredoka_600SemiBold,
   Fredoka_700Bold,
 } from '@expo-google-fonts/fredoka';
+import { Ionicons } from '@expo/vector-icons';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
@@ -12,10 +13,13 @@ import { Stack, useGlobalSearchParams, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { PostHogProvider } from 'posthog-react-native';
 import { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppConfigProvider, useAppConfig } from '../contexts/appConfigContext';
 import { AuthProvider, useAuth } from '../contexts/authContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { deepLinkStore } from '../services/deepLinkStore';
 import { posthog } from '../src/config/posthog';
+import { colors, spacing } from '../src/theme';
 
 Sentry.init({
   dsn: 'https://82e2b40542db948cc8d548c9a7ccbcfb@o4511378753257472.ingest.us.sentry.io/4511379227213824',
@@ -31,28 +35,64 @@ Sentry.init({
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
 
-  // uncomment the line below to enable Spotlight 
+  // uncomment the line below to enable Spotlight
   // spotlight: __DEV__,
 });
 
 SplashScreen.preventAutoHideAsync();
 
+function MaintenanceScreen({ message }: { message: string }) {
+  return (
+    <View style={maintenanceStyles.container}>
+      <Ionicons name="construct-outline" size={56} color={colors.primaryLight} />
+      <Text style={maintenanceStyles.title}>Down for Maintenance</Text>
+      <Text style={maintenanceStyles.message}>{message}</Text>
+    </View>
+  );
+}
+
+const maintenanceStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: 'Fredoka_700Bold',
+    color: colors.cardBackground,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  message: {
+    fontSize: 16,
+    fontFamily: 'Fredoka_400Regular',
+    color: colors.primaryLight,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+});
+
 function AppContent() {
   usePushNotifications();
-  const { loading } = useAuth();
+  const { loading: authLoading, session } = useAuth();
+  const { config, isAdmin, loading: configLoading } = useAppConfig();
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const previousPathname = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!loading) {
+    if (!authLoading && !configLoading) {
       SplashScreen.hideAsync();
     }
-  }, [loading]);
+  }, [authLoading, configLoading]);
 
 
-  // Capture reset-password deep link URLs before the screen mounts.
-  // The screen's own listeners register too late (after Expo Router has already
+  // capture reset-password deep link URLs before the screen mounts.
+  // the screen's own listeners register too late (after Expo Router has already
   // processed the URL and navigated), so we grab the code here and store it.
   useEffect(() => {
     const handleResetUrl = (url: string | null) => {
@@ -66,13 +106,13 @@ function AppContent() {
       }
     };
 
-    // Cold start: app launched by the deep link
+    // cold start
     Linking.getInitialURL().then(url => {
       console.log('[Layout] getInitialURL:', url);
       handleResetUrl(url);
     });
 
-    // Warm start: app already running when link is tapped
+    // warm start
     const sub = Linking.addEventListener('url', ({ url }) => {
       console.log('[Layout] url event:', url);
       handleResetUrl(url);
@@ -91,6 +131,10 @@ function AppContent() {
       previousPathname.current = pathname;
     }
   }, [pathname, params]);
+
+  if (!configLoading && !authLoading && config.maintenance_mode && !isAdmin && session) {
+    return <MaintenanceScreen message={config.maintenance_message} />;
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -124,7 +168,9 @@ export default Sentry.wrap(function RootLayout() {
       }}
     >
       <AuthProvider>
-        <AppContent />
+        <AppConfigProvider>
+          <AppContent />
+        </AppConfigProvider>
       </AuthProvider>
     </PostHogProvider>
   );
