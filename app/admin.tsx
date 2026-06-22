@@ -1,3 +1,4 @@
+import { useAppConfig } from '@/contexts/appConfigContext';
 import { useAuth } from '@/contexts/authContext';
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
@@ -10,6 +11,7 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -19,8 +21,10 @@ import {
 
 export default function AdminScreen() {
   const { session } = useAuth();
+  const { config, refetch: refetchConfig } = useAppConfig();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [flagLoading, setFlagLoading] = useState<string | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState(null);
   const [closedPeriods, setClosedPeriods] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -388,6 +392,21 @@ export default function AdminScreen() {
     }
   };
 
+  const handleToggleFeature = async (feature: string, currentValue: boolean) => {
+    setFlagLoading(feature);
+    try {
+      const { error } = await supabase.functions.invoke('toggle-feature', {
+        body: { feature, enabled: !currentValue },
+      });
+      if (error) throw error;
+      await refetchConfig();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update feature.');
+    } finally {
+      setFlagLoading(null);
+    }
+  };
+
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -441,6 +460,60 @@ export default function AdminScreen() {
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+        {/* Feature Flags */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <Ionicons name="toggle-outline" size={13} color={colors.primaryLight} />
+            <Text style={styles.sectionLabel}>FEATURE FLAGS</Text>
+          </View>
+          <View style={styles.card}>
+            {([
+              { key: 'voting_enabled', label: 'Voting', icon: 'checkmark-circle-outline', desc: 'Allow users to cast votes' },
+              { key: 'donating_enabled', label: 'Donations', icon: 'cash-outline', desc: 'Allow PayPal donations' },
+              { key: 'nominations_enabled', label: 'Nominations', icon: 'flag-outline', desc: 'Allow charity nominations' },
+              { key: 'maintenance_mode', label: 'Maintenance Mode', icon: 'construct-outline', desc: 'Show maintenance screen to all users' },
+            ] as const).map((flag, idx) => {
+              const value = !!config[flag.key];
+              const isMaintenance = flag.key === 'maintenance_mode';
+              return (
+                <View key={flag.key}>
+                  <View style={styles.flagRow}>
+                    <View style={styles.flagInfo}>
+                      <View style={styles.flagLabelRow}>
+                        <Ionicons name={flag.icon} size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                        <Text style={styles.flagLabel}>{flag.label}</Text>
+                        {isMaintenance && value && (
+                          <View style={styles.flagActivePill}>
+                            <Text style={styles.flagActivePillText}>ACTIVE</Text>
+                          </View>
+                        )}
+                        {!isMaintenance && !value && (
+                          <View style={styles.flagDisabledPill}>
+                            <Text style={styles.flagDisabledPillText}>OFF</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.flagDesc}>{flag.desc}</Text>
+                    </View>
+                    {flagLoading === flag.key ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Switch
+                        value={value}
+                        onValueChange={() => handleToggleFeature(flag.key, value)}
+                        trackColor={{ false: colors.border, true: isMaintenance ? colors.error : colors.success }}
+                        thumbColor={colors.white}
+                        disabled={flagLoading !== null}
+                      />
+                    )}
+                  </View>
+                  {idx < 3 && <View style={styles.rowDivider} />}
+                </View>
+              );
+            })}
+          </View>
+        </View>
 
         {/* Voting Period */}
         <View style={styles.section}>
@@ -974,7 +1047,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Header
+  // header
   header: {
     backgroundColor: colors.primary,
     paddingTop: spacing.xxl,
@@ -1013,7 +1086,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // Stats Strip
+  // stats Strip
   statsStrip: {
     flexDirection: 'row',
     backgroundColor: colors.primaryDark,
@@ -1046,7 +1119,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Sections
+  // sections
   section: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -1079,7 +1152,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_600SemiBold',
   },
 
-  // Cards
+  // cards
   card: {
     backgroundColor: colors.cardBackground,
     borderRadius: borderRadius.xl,
@@ -1107,7 +1180,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
 
-  // Status Pill
+  // status Pill
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1138,7 +1211,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
 
-  // Buttons
+  // buttons
   primaryBtn: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
@@ -1208,7 +1281,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Empty states
+  // empty states
   emptyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1221,7 +1294,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
 
-  // Period selector
+  // period selector
   periodItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1269,7 +1342,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
 
-  // Form
+  // form
   fieldGroup: {
     marginBottom: spacing.sm,
   },
@@ -1295,7 +1368,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(191, 163, 128, 0.4)',
   },
 
-  // Donation history rows
+  // donation history rows
   donationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1344,7 +1417,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Nomination cards
+  // nomination cards
   nominationHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1392,7 +1465,63 @@ const styles = StyleSheet.create({
     color: colors.warning,
   },
 
-  // Charity list rows
+  // Feature flag rows
+  flagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  flagInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  flagLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  flagLabel: {
+    fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_600SemiBold',
+    color: colors.text,
+  },
+  flagDesc: {
+    fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_400Regular',
+    color: colors.textLight,
+  },
+  flagActivePill: {
+    marginLeft: spacing.xs,
+    backgroundColor: 'rgba(231, 76, 60, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(231, 76, 60, 0.3)',
+    borderRadius: borderRadius.round,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  flagActivePillText: {
+    fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
+    color: colors.error,
+    letterSpacing: 0.5,
+  },
+  flagDisabledPill: {
+    marginLeft: spacing.xs,
+    backgroundColor: 'rgba(191, 163, 128, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(191, 163, 128, 0.4)',
+    borderRadius: borderRadius.round,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  flagDisabledPillText: {
+    fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_700Bold',
+    color: colors.primaryLight,
+    letterSpacing: 0.5,
+  },
+
+  // charity list rows
   charityListRow: {
     flexDirection: 'row',
     alignItems: 'center',

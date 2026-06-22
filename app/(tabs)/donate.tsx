@@ -1,5 +1,7 @@
+import { useAppConfig } from '@/contexts/appConfigContext';
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
+import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { usePostHog } from 'posthog-react-native';
 import { useEffect, useState } from 'react';
@@ -26,6 +28,7 @@ export default function DonateScreen() {
 
   const { requireAuth, user } = useRequireAuth();
   const posthog = usePostHog();
+  const { config } = useAppConfig();
 
   useEffect(() => {
     loadResults();
@@ -105,6 +108,10 @@ export default function DonateScreen() {
   };
 
   const handleDirectDonate = async () => {
+    if (!config.donating_enabled) {
+      Alert.alert('Donations Paused', 'Donations are temporarily paused. Check back soon.');
+      return;
+    }
     requireAuth(async () => {
       try {
         setDonating(true);
@@ -188,13 +195,20 @@ export default function DonateScreen() {
           You'll choose your amount securely on PayPal's page. Every dollar goes to this week's winning charity.
         </Text>
 
+        {!config.donating_enabled && (
+          <View style={styles.donationsPausedBanner}>
+            <Ionicons name="warning-outline" size={15} color={colors.warning} />
+            <Text style={styles.donationsPausedText}>Donations are temporarily paused</Text>
+          </View>
+        )}
+
         <TouchableOpacity
-          style={[styles.donateBtn, donating && styles.donateBtnDisabled]}
+          style={[styles.donateBtn, (donating || !config.donating_enabled) && styles.donateBtnDisabled]}
           onPress={handleDirectDonate}
-          disabled={donating}
+          disabled={donating || !config.donating_enabled}
         >
           <Text style={styles.donateBtnText}>
-            {donating ? 'Opening PayPal...' : 'Donate with PayPal'}
+            {donating ? 'Opening PayPal...' : !config.donating_enabled ? 'Donations Paused' : 'Donate with PayPal'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -321,6 +335,24 @@ const styles = StyleSheet.create({
     lineHeight: typography.sizes.sm * 1.6,
   },
 
+  donationsPausedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(243, 156, 18, 0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  donationsPausedText: {
+    fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_500Medium',
+    color: colors.warning,
+    flex: 1,
+  },
   donateBtn: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,

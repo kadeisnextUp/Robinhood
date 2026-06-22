@@ -1,3 +1,4 @@
+import { useAppConfig } from '@/contexts/appConfigContext';
 import { supabase } from '@/services/supabase';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +43,7 @@ export default function HomeScreen() {
 
   const { requireAuth } = useRequireAuth();
   const posthog = usePostHog();
+  const { config } = useAppConfig();
 
   useEffect(() => {
     loadCharities();
@@ -161,6 +163,10 @@ export default function HomeScreen() {
   };
 
   const handleNominate = (result: SearchResult) => {
+    if (!config.nominations_enabled) {
+      Alert.alert('Nominations Closed', 'Charity nominations are temporarily closed. Check back soon.');
+      return;
+    }
     requireAuth(() => {
       Alert.alert(
         'Nominate Charity',
@@ -212,6 +218,10 @@ export default function HomeScreen() {
   };
 
   const handleVote = async (charityId: string, charityName: string) => {
+    if (!config.voting_enabled) {
+      Alert.alert('Voting Paused', 'Voting is temporarily paused. Check back soon.');
+      return;
+    }
     requireAuth(() => {
       if (!currentPeriodId) {
         Alert.alert(
@@ -318,6 +328,20 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {(!config.voting_enabled || !config.nominations_enabled) && (
+        <View style={styles.featureBanner}>
+          <Ionicons name="warning-outline" size={15} color={colors.warning} />
+          <View style={{ flex: 1 }}>
+            {!config.voting_enabled && (
+              <Text style={styles.featureBannerText}>Voting is temporarily paused</Text>
+            )}
+            {!config.nominations_enabled && (
+              <Text style={styles.featureBannerText}>Charity nominations are closed</Text>
+            )}
+          </View>
+        </View>
+      )}
+
       <ScrollView style={styles.charityList} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         {/* search Results */}
         {searchResults !== null && (
@@ -366,6 +390,10 @@ export default function HomeScreen() {
                         </View>
                       ) : nominatingEin === result.ein ? (
                         <ActivityIndicator size="small" color={colors.primary} />
+                      ) : !config.nominations_enabled ? (
+                        <View style={styles.nominateClosedBadge}>
+                          <Text style={styles.nominateClosedBadgeText}>Closed</Text>
+                        </View>
                       ) : (
                         <View style={styles.nominateBadge}>
                           <Text style={styles.nominateBadgeText}>Nominate</Text>
@@ -402,13 +430,13 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.voteButton, userHasVoted && styles.voteButtonDisabled]}
+              style={[styles.voteButton, (userHasVoted || !config.voting_enabled) && styles.voteButtonDisabled]}
               onPress={() => handleVote(charity.id, charity.name)}
-              disabled={userHasVoted || votingFor === charity.id}
+              disabled={userHasVoted || votingFor === charity.id || !config.voting_enabled}
             >
               <Text style={styles.voteButtonText}>
-                {votingFor === charity.id ? 'Your vote' : userHasVoted ? 'Voted' : 'Vote '}
-                {!userHasVoted && <Ionicons name="heart" size={16} color={colors.white} />}
+                {votingFor === charity.id ? 'Your vote' : userHasVoted ? 'Voted' : !config.voting_enabled ? 'Paused' : 'Vote '}
+                {!userHasVoted && config.voting_enabled && <Ionicons name="heart" size={16} color={colors.white} />}
               </Text>
             </TouchableOpacity>
           </View>
@@ -534,6 +562,35 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontFamily: 'Fredoka_600SemiBold',
     fontWeight: typography.weights.semiBold,
+  },
+  featureBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(243, 156, 18, 0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    borderRadius: borderRadius.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+  },
+  featureBannerText: {
+    fontSize: typography.sizes.sm,
+    fontFamily: 'Fredoka_500Medium',
+    color: colors.warning,
+  },
+  nominateClosedBadge: {
+    backgroundColor: 'rgba(191, 163, 128, 0.2)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  nominateClosedBadgeText: {
+    color: colors.primaryLight,
+    fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_600SemiBold',
   },
   noResultsText: {
     color: colors.textSecondary,
