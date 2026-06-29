@@ -353,9 +353,9 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* ── Banner + avatar ── */}
+      {/* ── banner + avatar ── */}
       <View style={styles.banner}>
-        {/* Top-right actions overlaid on banner */}
+        {/* top-right actions overlaid on banner */}
         <View style={styles.bannerActions}>
           {profile.isAdmin && (
             <TouchableOpacity style={styles.adminChip} onPress={() => router.push('/admin')}>
