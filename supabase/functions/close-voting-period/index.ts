@@ -1,5 +1,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// returns true if `date` falls within US Eastern Daylight Time (UTC-4).
+// DST starts: 2nd Sunday of March at 02:00 EST (07:00 UTC)
+// DST ends:   1st Sunday of November at 02:00 EDT (06:00 UTC)
+function isEasternDST(date: Date): boolean {
+  const y = date.getUTCFullYear();
+  const mar1Day = new Date(Date.UTC(y, 2, 1)).getUTCDay();
+  const firstSunMar = mar1Day === 0 ? 1 : 8 - mar1Day;
+  const dstStart = new Date(Date.UTC(y, 2, firstSunMar + 7, 7, 0, 0));
+  const nov1Day = new Date(Date.UTC(y, 10, 1)).getUTCDay();
+  const firstSunNov = nov1Day === 0 ? 1 : 8 - nov1Day;
+  const dstEnd = new Date(Date.UTC(y, 10, firstSunNov, 6, 0, 0));
+  return date >= dstStart && date < dstEnd;
+}
+
 Deno.serve(async (req) => {
   try {
     const supabase = createClient(
@@ -14,21 +28,24 @@ Deno.serve(async (req) => {
     const forcePeriodId = body?.period_id ?? null;
     const now = new Date().toISOString();
 
+    // atomically mark periods as closed and return only those claimed by this invocation.
     let expiredPeriods;
     if (force && forcePeriodId) {
       const { data, error } = await supabase
         .from('voting_periods')
-        .select('id')
+        .update({ is_closed: true })
         .eq('id', forcePeriodId)
-        .eq('is_closed', false);
+        .eq('is_closed', false)
+        .select('id');
       if (error) throw error;
       expiredPeriods = data;
     } else {
       const { data, error } = await supabase
         .from('voting_periods')
-        .select('id')
+        .update({ is_closed: true })
         .eq('is_closed', false)
-        .lt('end_date', now);
+        .lt('end_date', now)
+        .select('id');
       if (error) throw error;
       expiredPeriods = data;
     }
@@ -68,7 +85,7 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await supabase
         .from('voting_periods')
-        .update({ is_closed: true, winner_charity_id: winner.charity_id })
+        .update({ winner_charity_id: winner.charity_id })
         .eq('id', period.id);
 
       if (updateError) throw updateError;
@@ -125,7 +142,7 @@ Deno.serve(async (req) => {
     }
 
     // when running on schedule (not admin force-close), automatically create next week's period.
-    // the new period starts next Monday 05:00 UTC so the 5-hour dead phase (Sun 23:55–Mon 05:00) is preserved.
+    // open/close times are pinned to Eastern clock time (DST-aware): open Mon 00:00 ET, close Sun 23:55 ET.
     let nextPeriodId: string | null = null;
     if (!force) {
       const { data: existing } = await supabase
@@ -135,18 +152,26 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
-        // open Monday 05:00 UTC = midnight EST / 1 AM EDT
-        // gives admin ~5 hours after Sunday close to record and send the donation
-        const nextStart = new Date();
-        const dayOfWeek = nextStart.getUTCDay();
+        // find next Monday (UTC date) using noon as a stable DST-check anchor
+        const nextMondayNoon = new Date();
+        const dayOfWeek = nextMondayNoon.getUTCDay();
         const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
-        nextStart.setUTCDate(nextStart.getUTCDate() + daysToMonday);
-        nextStart.setUTCHours(5, 0, 0, 0);
+        nextMondayNoon.setUTCDate(nextMondayNoon.getUTCDate() + daysToMonday);
+        nextMondayNoon.setUTCHours(12, 0, 0, 0);
 
-        // end: following Sunday 23:55 UTC (~7 PM EST / 8 PM EDT)
-        const nextEnd = new Date(nextStart);
-        nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
-        nextEnd.setUTCHours(23, 55, 0, 0);
+        // open: Monday 00:00 Eastern — EDT=UTC-4 → 04:00 UTC, EST=UTC-5 → 05:00 UTC
+        const startOffsetHours = isEasternDST(nextMondayNoon) ? 4 : 5;
+        const nextStart = new Date(nextMondayNoon);
+        nextStart.setUTCHours(startOffsetHours, 0, 0, 0);
+
+        // close: Sunday 23:55 Eastern — check DST for that Sunday at noon
+        const nextSundayNoon = new Date(nextMondayNoon);
+        nextSundayNoon.setUTCDate(nextSundayNoon.getUTCDate() + 6);
+        const endOffsetHours = isEasternDST(nextSundayNoon) ? 4 : 5;
+        // Sunday 23:55 ET = the following Monday at (offset-1):55 UTC
+        const nextEnd = new Date(nextSundayNoon);
+        nextEnd.setUTCDate(nextEnd.getUTCDate() + 1); // following Monday
+        nextEnd.setUTCHours(endOffsetHours - 1, 55, 0, 0);
 
         const { data: recentPeriods } = await supabase
           .from('voting_periods')
