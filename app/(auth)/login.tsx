@@ -174,7 +174,7 @@ export default function LoginScreen() {
           ) : (
             <>
               <Text style={styles.title}>Reset Password</Text>
-              <Text style={styles.subtitle}>Enter your email or username and we'll send a reset link</Text>
+              <Text style={styles.subtitle}>Enter your email or username and we&apos;ll send a reset link</Text>
 
               <TextInput
                 style={styles.input}
@@ -261,7 +261,7 @@ export default function LoginScreen() {
           params: { returnTo: returnTo ?? '/(tabs)' }
         })}>
           <Text style={styles.linkText}>
-            Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+            Don&apos;t have an account? <Text style={styles.linkBold}>Sign Up</Text>
           </Text>
         </TouchableOpacity>
       </View>
