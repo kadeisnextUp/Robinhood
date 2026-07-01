@@ -1,16 +1,30 @@
 import { colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../../services/supabase';
 import { isProfane } from '../../src/utils/profanity';
 import { usePostHog } from 'posthog-react-native';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
+const MINIMUM_AGE = 13;
+
+function calculateAge(dateOfBirth: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 export default function SignupScreen() {
   const [username, setUsername] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,9 +35,21 @@ export default function SignupScreen() {
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDateOfBirth(selectedDate);
+    }
+  };
+
   const handleSignup = async () => {
-    if (!username || !email || !password || !confirmPassword) {
+    if (!username || !dateOfBirth || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (calculateAge(dateOfBirth) < MINIMUM_AGE) {
+      Alert.alert('Error', `You must be at least ${MINIMUM_AGE} years old to create an account.`);
       return;
     }
 
@@ -72,7 +98,10 @@ export default function SignupScreen() {
         email: email.trim(),
         password,
         options: {
-          data: { username: username.toLowerCase() },
+          data: {
+            username: username.toLowerCase(),
+            date_of_birth: dateOfBirth.toISOString().split('T')[0],
+          },
         },
       });
 
@@ -123,6 +152,22 @@ export default function SignupScreen() {
         onSubmitEditing={() => emailRef.current?.focus()}
         submitBehavior="submit"
       />
+
+      <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+        <Text style={dateOfBirth ? styles.dateText : styles.datePlaceholder}>
+          {dateOfBirth ? dateOfBirth.toLocaleDateString() : 'Date of Birth'}
+        </Text>
+      </TouchableOpacity>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={dateOfBirth ?? new Date(2000, 0, 1)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          maximumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
 
       <TextInput
         ref={emailRef}
@@ -212,6 +257,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  dateText: {
+    fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
+    color: colors.text,
+  },
+  datePlaceholder: {
+    fontSize: typography.sizes.md,
+    fontFamily: 'Fredoka_400Regular',
+    color: colors.grey,
   },
   backButton: {
     position: 'absolute',
