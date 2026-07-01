@@ -167,7 +167,7 @@ export default function DonateScreen() {
         <Text style={styles.heroAmount}>${weeklyPool.toFixed(2)}</Text>
         <View style={styles.heroDivider} />
         <Text style={styles.heroMission}>
-          100% of every dollar goes directly to this week's winning charity — no fees, no overhead.
+          100% of every dollar goes directly to this week&apos;s winning charity — no fees, no overhead.
         </Text>
         {timeRemaining ? (
           <View style={styles.countdownPill}>
@@ -181,7 +181,7 @@ export default function DonateScreen() {
         <View style={styles.contributionBanner}>
           <Text style={styles.contributionEmoji}>💵</Text>
           <Text style={styles.contributionText}>
-            You've contributed{' '}
+            You&apos;ve contributed{' '}
             <Text style={styles.contributionAmount}>${userDonationAmount.toFixed(2)}</Text>
             {' '}this week
           </Text>
@@ -192,7 +192,7 @@ export default function DonateScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Make a Donation</Text>
         <Text style={styles.cardSubtitle}>
-          You'll choose your amount securely on PayPal's page. Every dollar goes to this week's winning charity.
+          You&apos;ll choose your amount securely on PayPal&apos;s page. Every dollar goes to this week&apos;s winning charity.
         </Text>
 
         {!config.donating_enabled && (

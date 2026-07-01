@@ -423,7 +423,7 @@ export default function AdminScreen() {
       <View style={styles.errorContainer}>
         <Ionicons name="lock-closed" size={48} color={colors.primaryLight} />
         <Text style={styles.errorTitle}>Access Denied</Text>
-        <Text style={styles.errorSubtitle}>You don't have permission to view this page.</Text>
+        <Text style={styles.errorSubtitle}>You don&apos;t have permission to view this page.</Text>
       </View>
     );
   }
