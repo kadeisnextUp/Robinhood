@@ -352,7 +352,7 @@ export default function HomeScreen() {
 
             {searchResults.length === 0 ? (
               <View style={styles.resultCard}>
-                <Text style={styles.noResultsText}>No charities found for "{searchQuery}".</Text>
+                <Text style={styles.noResultsText}>No charities found for &quot;{searchQuery}&quot;.</Text>
               </View>
             ) : (
               searchResults.map((result) => (
