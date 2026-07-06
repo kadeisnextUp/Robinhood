@@ -37,12 +37,6 @@ export default function DonationReceiptsScreen() {
       setLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('Sign in to view donation receipts.');
-        return;
-      }
-
       // get all closed donations with charity info and period info
       const { data: donations, error: donationsError } = await supabase
         .from('donations')
@@ -138,14 +132,12 @@ export default function DonationReceiptsScreen() {
   }
 
   if (error) {
-    const isSignedOut = error === 'Sign in to view donation receipts.';
     return (
       <View style={[styles.screen, { justifyContent: 'center', alignItems: 'center' }]}>
         <RetryState
           tone="light"
-          icon={isSignedOut ? 'log-in-outline' : 'cloud-offline-outline'}
-          title={isSignedOut ? 'Sign in required' : "Couldn't load receipts"}
-          message={isSignedOut ? error : 'Check your connection and try again.'}
+          title="Couldn't load receipts"
+          message="Check your connection and try again."
           onRetry={loadReceipts}
         />
       </View>
