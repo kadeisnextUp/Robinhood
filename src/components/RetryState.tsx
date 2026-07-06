@@ -17,11 +17,15 @@ interface RetryStateProps {
   onRetry: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
   tone?: 'light' | 'dark';
+  accentColor?: string;
+  buttonLabel?: string;
+  buttonIcon?: keyof typeof Ionicons.glyphMap;
 }
 
 /**
- * Shared error/retry state for screens that fetch data on mount (home, receipts).
+ * shared error/retry state for screens that fetch data on mount (home, receipts, poll, profile, ...).
  * `tone` picks text/icon contrast for screens with a dark (brown) vs light (cream) background.
+ * `accentColor` overrides the button color for screens with their own brand accent (e.g. the gold leaderboard).
  */
 const RetryState: React.FC<RetryStateProps> = ({
   title,
@@ -29,6 +33,9 @@ const RetryState: React.FC<RetryStateProps> = ({
   onRetry,
   icon = 'cloud-offline-outline',
   tone = 'dark',
+  accentColor = colors.primary,
+  buttonLabel = 'Try again',
+  buttonIcon = 'refresh',
 }) => {
   const pressScale = useSharedValue(1);
   const isLight = tone === 'light';
@@ -69,12 +76,12 @@ const RetryState: React.FC<RetryStateProps> = ({
           onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={styles.retryButton}
+          style={[styles.retryButton, { backgroundColor: accentColor }]}
           accessibilityRole="button"
-          accessibilityLabel="Try again"
+          accessibilityLabel={buttonLabel}
         >
-          <Ionicons name="refresh" size={16} color={colors.white} />
-          <Text style={styles.retryButtonText}>Try again</Text>
+          <Ionicons name={buttonIcon} size={16} color={colors.white} />
+          <Text style={styles.retryButtonText}>{buttonLabel}</Text>
         </Pressable>
       </Animated.View>
     </Animated.View>
@@ -118,7 +125,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.primary,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
