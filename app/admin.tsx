@@ -1,6 +1,7 @@
 import { useAppConfig } from '@/contexts/appConfigContext';
 import { useAuth } from '@/contexts/authContext';
 import { supabase } from '@/services/supabase';
+import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +25,7 @@ export default function AdminScreen() {
   const { config, refetch: refetchConfig } = useAppConfig();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState(false);
   const [flagLoading, setFlagLoading] = useState<string | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState(null);
   const [closedPeriods, setClosedPeriods] = useState([]);
@@ -66,6 +68,8 @@ export default function AdminScreen() {
   }, [session]);
 
   const checkAdminAccess = async () => {
+    setLoading(true);
+    setAccessError(false);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -79,6 +83,7 @@ export default function AdminScreen() {
       }
     } catch (err) {
       console.error('Admin check error:', err);
+      setAccessError(true);
     } finally {
       setLoading(false);
     }
@@ -110,6 +115,7 @@ export default function AdminScreen() {
       setClosedPeriods(closed?.filter((p) => !donatedPeriodIds.includes(p.id)) ?? []);
     } catch (err) {
       console.error('Load periods error:', err);
+      Alert.alert('Error', 'Failed to load voting periods.');
     }
   };
 
@@ -185,6 +191,7 @@ export default function AdminScreen() {
       setCharities(data ?? []);
     } catch (err) {
       console.error('Load charities error:', err);
+      Alert.alert('Error', 'Failed to load charities.');
     }
   };
 
@@ -201,6 +208,7 @@ export default function AdminScreen() {
       setPendingNominations(withPending);
     } catch (err) {
       console.error('Load pending nominations error:', err);
+      Alert.alert('Error', 'Failed to load pending nominations.');
     }
   };
 
@@ -269,6 +277,7 @@ export default function AdminScreen() {
       setDonationsHistory(data ?? []);
     } catch (err) {
       console.error('Load donations history error:', err);
+      Alert.alert('Error', 'Failed to load donations history.');
     }
   };
 
@@ -414,6 +423,19 @@ export default function AdminScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primaryLight} />
+      </View>
+    );
+  }
+
+  if (accessError) {
+    return (
+      <View style={styles.errorContainer}>
+        <RetryState
+          tone="light"
+          title="Couldn't verify access"
+          message="Check your connection and try again."
+          onRetry={checkAdminAccess}
+        />
       </View>
     );
   }

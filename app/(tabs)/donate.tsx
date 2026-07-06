@@ -1,11 +1,13 @@
 import { useAppConfig } from '@/contexts/appConfigContext';
 import { supabase } from '@/services/supabase';
+import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { usePostHog } from 'posthog-react-native';
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   RefreshControl,
   ScrollView,
@@ -25,13 +27,15 @@ export default function DonateScreen() {
   const [timeRemaining, setTimeRemaining] = useState('');
   const [donating, setDonating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { requireAuth, user } = useRequireAuth();
   const posthog = usePostHog();
   const { config } = useAppConfig();
 
   useEffect(() => {
-    loadResults();
+    loadResults(true);
   }, []);
 
   useEffect(() => {
@@ -72,8 +76,9 @@ export default function DonateScreen() {
     setRefreshing(false);
   };
 
-  const loadResults = async () => {
+  const loadResults = async (isInitial = false) => {
     try {
+      if (isInitial) setError(null);
       const { data: period, error: periodError } = await supabase
         .from('voting_periods')
         .select('id, start_date, end_date')
@@ -104,6 +109,9 @@ export default function DonateScreen() {
       }
     } catch (err) {
       console.error('Error loading voting period:', err);
+      if (isInitial) setError('Failed to load donation info.');
+    } finally {
+      if (isInitial) setLoading(false);
     }
   };
 
@@ -146,6 +154,27 @@ export default function DonateScreen() {
       }
     });
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <RetryState
+          tone="light"
+          title="Couldn't load donation info"
+          message={error}
+          onRetry={() => loadResults(true)}
+        />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
