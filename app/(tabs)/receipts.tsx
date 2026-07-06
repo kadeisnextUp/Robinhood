@@ -1,5 +1,6 @@
 import CardSwap, { Card } from '@/src/components/CardSwap';
 import ReceiptCard from '@/src/components/ReceiptCard';
+import RetryState from '@/src/components/RetryState';
 import { colors, spacing } from '@/src/theme';
 import { useFocusEffect } from 'expo-router';
 import { usePostHog } from 'posthog-react-native';
@@ -137,15 +138,16 @@ export default function DonationReceiptsScreen() {
   }
 
   if (error) {
+    const isSignedOut = error === 'Sign in to view donation receipts.';
     return (
       <View style={[styles.screen, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: colors.white }}>{error}</Text>
-        <Text
-          style={{ color: colors.secondary, marginTop: spacing.md }}
-          onPress={loadReceipts}
-        >
-          Tap to retry
-        </Text>
+        <RetryState
+          tone="light"
+          icon={isSignedOut ? 'log-in-outline' : 'cloud-offline-outline'}
+          title={isSignedOut ? 'Sign in required' : "Couldn't load receipts"}
+          message={isSignedOut ? error : 'Check your connection and try again.'}
+          onRetry={loadReceipts}
+        />
       </View>
     );
   }
