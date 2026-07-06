@@ -1,5 +1,6 @@
 import { useAppConfig } from '@/contexts/appConfigContext';
 import { supabase } from '@/services/supabase';
+import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { usePostHog } from 'posthog-react-native';
@@ -287,10 +288,12 @@ export default function HomeScreen() {
   if (error) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: colors.error }}>Failed to load charities</Text>
-        <TouchableOpacity onPress={loadCharities}>
-          <Text style={{ color: colors.primary }}>Retry</Text>
-        </TouchableOpacity>
+        <RetryState
+          tone="light"
+          title="Couldn't load charities"
+          message={error === 'No active voting period. Please check back later.' ? error : 'Check your connection and try again.'}
+          onRetry={loadCharities}
+        />
       </View>
     );
   }

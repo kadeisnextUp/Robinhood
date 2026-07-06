@@ -1,5 +1,6 @@
 import CardSwap, { Card } from '@/src/components/CardSwap';
 import ReceiptCard from '@/src/components/ReceiptCard';
+import RetryState from '@/src/components/RetryState';
 import { colors, spacing } from '@/src/theme';
 import { useFocusEffect } from 'expo-router';
 import { usePostHog } from 'posthog-react-native';
@@ -35,12 +36,6 @@ export default function DonationReceiptsScreen() {
     try {
       setLoading(true);
       setError(null);
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('Sign in to view donation receipts.');
-        return;
-      }
 
       // get all closed donations with charity info and period info
       const { data: donations, error: donationsError } = await supabase
@@ -139,13 +134,12 @@ export default function DonationReceiptsScreen() {
   if (error) {
     return (
       <View style={[styles.screen, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: colors.white }}>{error}</Text>
-        <Text
-          style={{ color: colors.secondary, marginTop: spacing.md }}
-          onPress={loadReceipts}
-        >
-          Tap to retry
-        </Text>
+        <RetryState
+          tone="light"
+          title="Couldn't load receipts"
+          message="Check your connection and try again."
+          onRetry={loadReceipts}
+        />
       </View>
     );
   }

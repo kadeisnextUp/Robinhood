@@ -1,4 +1,5 @@
 import { supabase } from '@/services/supabase';
+import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { usePostHog } from 'posthog-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -175,8 +176,13 @@ export default function CurrentResultsScreen() {
   if (error) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Text style={styles.retryText} onPress={loadResults}>TAP TO RETRY</Text>
+        <RetryState
+          tone="light"
+          accentColor={colors.gold}
+          title="Couldn't load the leaderboard"
+          message="Check your connection and try again."
+          onRetry={loadResults}
+        />
       </View>
     );
   }
@@ -531,22 +537,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 4,
     marginTop: spacing.md,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: typography.sizes.lg,
-    fontFamily: 'Fredoka_700Bold',
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-    letterSpacing: 1,
-  },
-  retryText: {
-    color: colors.gold,
-    fontSize: typography.sizes.md,
-    fontFamily: 'Fredoka_700Bold',
-    fontWeight: '900',
-    letterSpacing: 3,
   },
   emptyText: {
     color: colors.white,

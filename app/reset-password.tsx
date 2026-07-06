@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { deepLinkStore } from '../services/deepLinkStore';
 import { supabase } from '../services/supabase';
+import RetryState from '../src/components/RetryState';
 import { colors, spacing, typography } from '../src/theme';
 
 export default function ResetPasswordScreen() {
@@ -134,12 +135,15 @@ export default function ResetPasswordScreen() {
   if (sessionError) {
     return (
       <View style={[styles.container, styles.center]}>
-        <Ionicons name="alert-circle-outline" size={72} color={colors.error ?? colors.primary} />
-        <Text style={styles.title}>Link Expired</Text>
-        <Text style={styles.subtitle}>This reset link is invalid or has expired. Request a new one from the login screen.</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.replace('/(auth)/login')}>
-          <Text style={styles.buttonText}>Back to Login</Text>
-        </TouchableOpacity>
+        <RetryState
+          tone="light"
+          icon="alert-circle-outline"
+          title="Link expired"
+          message="This reset link is invalid or has expired. Request a new one from the login screen."
+          buttonLabel="Back to login"
+          buttonIcon="arrow-back"
+          onRetry={() => router.replace('/(auth)/login')}
+        />
         <DebugLog />
       </View>
     );
