@@ -153,9 +153,10 @@ Deno.serve(async (req) => {
 
       if (!existing) {
         // find next Monday (UTC date) using noon as a stable DST-check anchor
+        // this cron runs on Monday, so daysToMonday must resolve to 0 that day, not wrap to 7
         const nextMondayNoon = new Date();
         const dayOfWeek = nextMondayNoon.getUTCDay();
-        const daysToMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+        const daysToMonday = (8 - dayOfWeek) % 7;
         nextMondayNoon.setUTCDate(nextMondayNoon.getUTCDate() + daysToMonday);
         nextMondayNoon.setUTCHours(12, 0, 0, 0);
 

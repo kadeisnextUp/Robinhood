@@ -1,3 +1,4 @@
+import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
@@ -341,10 +342,12 @@ export default function ProfileScreen() {
   if (error || !profile) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>{error || 'Profile not found'}</Text>
-        <TouchableOpacity onPress={fetchProfileData} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <RetryState
+          tone="light"
+          title="Couldn't load profile"
+          message={error ?? 'Profile not found. Please try again.'}
+          onRetry={fetchProfileData}
+        />
       </View>
     );
   }
@@ -847,25 +850,5 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.body,
     fontFamily: 'Fredoka_400Regular',
     color: colors.grey,
-  },
-  errorText: {
-    fontSize: typography.sizes.body,
-    fontFamily: 'Fredoka_400Regular',
-    color: colors.error,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-  },
-  retryButtonText: {
-    color: colors.white,
-    fontSize: typography.sizes.body,
-    fontFamily: 'Fredoka_700Bold',
-    fontWeight: typography.weights.bold,
   },
 });
