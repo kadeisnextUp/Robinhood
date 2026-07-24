@@ -56,4 +56,12 @@ CLAUDE.md
 AGENTS.md
 .claude/
 
+# impeccable
+.impeccable/
+.impeccable-live.json
+.impeccable-live/
+.github/hooks/
+PRODUCT.md
+DESIGN.md
+
 .env.local
