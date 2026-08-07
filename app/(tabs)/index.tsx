@@ -1,5 +1,6 @@
 import { useAppConfig } from '@/contexts/appConfigContext';
 import { supabase } from '@/services/supabase';
+import CharityLogo from '@/src/components/CharityLogo';
 import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +9,6 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   Linking,
   ScrollView,
@@ -28,12 +28,21 @@ type SearchResult = {
   inDatabase: boolean;
 };
 
+type Charity = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  logo_url: string | null;
+  website_url: string | null;
+};
+
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [votingFor, setVotingFor] = useState(null);
   const [userHasVoted, setUserHasVoted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [charities, setCharities] = useState([]);
+  const [charities, setCharities] = useState<Charity[]>([]);
   const [currentPeriodId, setCurrentPeriodId] = useState(null);
 
   // search state
@@ -89,7 +98,10 @@ export default function HomeScreen() {
 
       if (charitiesError) throw charitiesError;
 
-      const charityList = periodCharities.map((item) => item.charities);
+      // supabase-js types an embedded FK select as an array, but this relation is
+      // one-to-one and returns a single object at runtime. Cast rather than change
+      // the shape, so behaviour here is identical to before.
+      const charityList = periodCharities.map((item) => item.charities) as unknown as Charity[];
       setCharities(charityList);
     } catch (err) {
       setError(err.message);
@@ -420,13 +432,18 @@ export default function HomeScreen() {
 
         {charities.map((charity) => (
           <View key={charity.id} style={styles.charityCard}>
-            <Image source={{ uri: charity.logo_url }} style={styles.charityImage} />
+            <CharityLogo
+              logoUrl={charity.logo_url}
+              name={charity.name}
+              variant="banner"
+              style={styles.charityImage}
+            />
             <Text style={styles.charityCategory}>{charity.category}</Text>
             <Text style={styles.charityName}>{charity.name}</Text>
             <Text style={styles.charityDescription}>{charity.description}</Text>
             {charity.website_url && (
               <TouchableOpacity
-                onPress={() => Linking.openURL(charity.website_url)}
+                onPress={() => charity.website_url && Linking.openURL(charity.website_url.trim())}
                 style={styles.websiteButton}
               >
                 <Text style={styles.websiteButtonText}>Visit Website →</Text>
@@ -635,10 +652,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   charityImage: {
-    width: '100%',
-    height: 200,
+    // Sizing and resizeMode now live inside CharityLogo; this style lands on its
+    // wrapper View, so an Image-only prop like resizeMode would be invalid here.
     marginBottom: spacing.lg,
-    resizeMode: 'contain',
   },
   charityName: {
     fontSize: typography.sizes.lg,
