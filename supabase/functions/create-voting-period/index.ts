@@ -9,6 +9,55 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Authorisation. config.toml sets verify_jwt = true, but that alone is not a
+    // real gate: the anon key is itself a valid JWT and it ships inside every copy
+    // of the app, so the gateway would accept any caller. Opening a voting period
+    // is an admin action, so check it here.
+    //
+    // Two accepted callers:
+    //   1. a scheduled job presenting CRON_SECRET in x-cron-secret
+    //   2. a signed-in user whose profile has is_admin
+    //
+    // Nothing schedules this today (close-voting-period creates the next period
+    // itself), but it accepts the same secret as its sibling so a schedule can be
+    // added without another auth change. Mirrors toggle-feature's x-admin-secret.
+    const cronSecret = req.headers.get('x-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+    const usingCronSecret = !!expectedCronSecret && cronSecret === expectedCronSecret;
+
+    if (!usingCronSecret) {
+      const authHeader = req.headers.get('Authorization') ?? '';
+      const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+      if (!bearer) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(bearer);
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.is_admin) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Forbidden' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     // guard: don't create a new period if one is already open
     const { data: existingPeriod } = await supabase
       .from('voting_periods')
