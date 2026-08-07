@@ -38,7 +38,21 @@ export default function AdminScreen() {
 
   const [charities, setCharities] = useState([]);
   const [pendingNominations, setPendingNominations] = useState<any[]>([]);
+  const [incompleteCharities, setIncompleteCharities] = useState<any[]>([]);
   const [nominationActionLoading, setNominationActionLoading] = useState<string | null>(null);
+
+  // charity field editor
+  const [editingCharityId, setEditingCharityId] = useState<string | null>(null);
+  const [charityForm, setCharityForm] = useState({
+    name: '',
+    ein: '',
+    description: '',
+    category: '',
+    website_url: '',
+    logo_url: '',
+  });
+  const [charityLogoUri, setCharityLogoUri] = useState<string | null>(null);
+  const [savingCharity, setSavingCharity] = useState(false);
 
   const transactionIdRef = useRef<TextInput>(null);
   const editTransactionIdRef = useRef<TextInput>(null);
@@ -79,7 +93,7 @@ export default function AdminScreen() {
       if (error) throw error;
       setIsAdmin(data.is_admin);
       if (data.is_admin) {
-        await Promise.all([loadPeriods(), loadCharities(), loadDonationsHistory(), loadPendingNominations()]);
+        await Promise.all([loadPeriods(), loadCharities(), loadDonationsHistory(), loadUnapprovedCharities()]);
       }
     } catch (err) {
       console.error('Admin check error:', err);
@@ -195,20 +209,25 @@ export default function AdminScreen() {
     }
   };
 
-  const loadPendingNominations = async () => {
+  // One query feeds two lists. Charities with a pending nomination are the queue
+  // to act on; the rest are unapproved rows nobody nominated (bulk imports,
+  // charities whose nominations were all rejected). Those used to appear in no
+  // admin list at all, so there was no way to finish or remove them in-app.
+  const loadUnapprovedCharities = async () => {
     try {
       const { data, error } = await supabase
         .from('charities')
         .select(`id, name, ein, description, logo_url, website_url, category, nominations(id, status)`)
-        .eq('is_approved', false);
+        .eq('is_approved', false)
+        .order('name', { ascending: true });
       if (error) throw error;
-      const withPending = (data ?? []).filter((c: any) =>
-        c.nominations?.some((n: any) => n.status === 'pending')
-      );
-      setPendingNominations(withPending);
+      const all = data ?? [];
+      const hasPending = (c: any) => c.nominations?.some((n: any) => n.status === 'pending');
+      setPendingNominations(all.filter(hasPending));
+      setIncompleteCharities(all.filter((c: any) => !hasPending(c)));
     } catch (err) {
-      console.error('Load pending nominations error:', err);
-      Alert.alert('Error', 'Failed to load pending nominations.');
+      console.error('Load unapproved charities error:', err);
+      Alert.alert('Error', 'Failed to load unapproved charities.');
     }
   };
 
@@ -233,7 +252,7 @@ export default function AdminScreen() {
             const { error } = await supabase.functions.invoke('approve-charity', { body: { charity_id: charityId } });
             if (error) throw error;
             Alert.alert('Approved', `${charityName} is now pool-eligible. Nominators have been notified.`);
-            await Promise.all([loadCharities(), loadPendingNominations()]);
+            await Promise.all([loadCharities(), loadUnapprovedCharities()]);
           } catch (err: any) {
             Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to approve charity.');
           } finally {
@@ -256,7 +275,7 @@ export default function AdminScreen() {
             const { error } = await supabase.functions.invoke('reject-charity', { body: { charity_id: charityId } });
             if (error) throw error;
             Alert.alert('Rejected', `Nomination for ${charityName} has been rejected. Nominators have been notified.`);
-            await loadPendingNominations();
+            await loadUnapprovedCharities();
           } catch (err: any) {
             Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to reject charity.');
           } finally {
@@ -303,6 +322,305 @@ export default function AdminScreen() {
     return publicUrl;
   };
 
+  // Logos live in our own bucket rather than hotlinking the charity's site, which
+  // goes stale when they redesign. Uploading also sidesteps SVG: the picker hands
+  // back a raster image, and React Native's <Image> cannot decode SVG.
+  const uploadCharityLogo = async (uri: string, charityId: string): Promise<string> => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const filename = `${charityId}-${Date.now()}.jpg`;
+    const { data, error } = await supabase.storage
+      .from('charity-logos')
+      .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabase.storage.from('charity-logos').getPublicUrl(data.path);
+    return publicUrl;
+  };
+
+  const startEditingCharity = (charity: any) => {
+    setEditingCharityId(charity.id);
+    setCharityLogoUri(null);
+    setCharityForm({
+      name: charity.name ?? '',
+      ein: charity.ein ?? '',
+      description: charity.description ?? '',
+      category: charity.category ?? '',
+      website_url: charity.website_url ?? '',
+      logo_url: charity.logo_url ?? '',
+    });
+  };
+
+  const cancelEditingCharity = () => {
+    setEditingCharityId(null);
+    setCharityLogoUri(null);
+  };
+
+  const handleSaveCharity = async (charityId: string) => {
+    setSavingCharity(true);
+    try {
+      let logoUrl = charityForm.logo_url.trim();
+      if (charityLogoUri) {
+        logoUrl = await uploadCharityLogo(charityLogoUri, charityId);
+      }
+
+      const { data, error } = await supabase.functions.invoke('update-charity', {
+        body: {
+          charity_id: charityId,
+          name: charityForm.name,
+          ein: charityForm.ein,
+          description: charityForm.description,
+          category: charityForm.category,
+          website_url: charityForm.website_url,
+          logo_url: logoUrl,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setEditingCharityId(null);
+      setCharityLogoUri(null);
+      await loadUnapprovedCharities();
+    } catch (err: any) {
+      Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to save charity.');
+    } finally {
+      setSavingCharity(false);
+    }
+  };
+
+  const setCharityField = (key: keyof typeof charityForm, value: string) =>
+    setCharityForm((prev) => ({ ...prev, [key]: value }));
+
+  // Shared by both unapproved lists. Nominated charities additionally show the
+  // nomination count and a Reject button; everything else is identical.
+  const renderCharityCard = (charity: any, isNomination: boolean) => {
+    const complete = isCharityComplete(charity);
+    const isEditing = editingCharityId === charity.id;
+    const nominationCount = charity.nominations?.filter((n: any) => n.status === 'pending').length ?? 0;
+    const isApprovingThis = nominationActionLoading === charity.id + '_approve';
+    const isRejectingThis = nominationActionLoading === charity.id + '_reject';
+    const missing = ['description', 'logo_url', 'website_url', 'category', 'ein', 'name'].filter(
+      (field) => !charity[field]?.toString().trim()
+    );
+
+    if (isEditing) {
+      return (
+        <View key={charity.id} style={styles.card}>
+          <View style={styles.editBlock}>
+            <Text style={styles.editBlockTitle}>{charity.name || 'Untitled charity'}</Text>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={charityForm.name}
+                onChangeText={(v) => setCharityField('name', v)}
+                placeholder="Charity name"
+                placeholderTextColor={colors.primaryLight}
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>EIN (9 digits)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={charityForm.ein}
+                onChangeText={(v) => setCharityField('ein', v)}
+                placeholder="123456789"
+                placeholderTextColor={colors.primaryLight}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Category</Text>
+              <TextInput
+                style={styles.textInput}
+                value={charityForm.category}
+                onChangeText={(v) => setCharityField('category', v)}
+                placeholder="e.g. Food Security"
+                placeholderTextColor={colors.primaryLight}
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Description</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                value={charityForm.description}
+                onChangeText={(v) => setCharityField('description', v)}
+                placeholder="What this charity does — shown on the vote card"
+                placeholderTextColor={colors.primaryLight}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+              <Text style={styles.fieldHint}>{charityForm.description.length}/500</Text>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Website</Text>
+              <TextInput
+                style={styles.textInput}
+                value={charityForm.website_url}
+                onChangeText={(v) => setCharityField('website_url', v)}
+                placeholder="https://example.org"
+                placeholderTextColor={colors.primaryLight}
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Logo</Text>
+              <TouchableOpacity
+                style={[styles.outlineBtn, (charityLogoUri || charityForm.logo_url) && styles.outlineBtnSuccess]}
+                onPress={() => pickProofImage(setCharityLogoUri)}
+              >
+                <View style={styles.btnInner}>
+                  <Ionicons
+                    name={charityLogoUri || charityForm.logo_url ? 'checkmark-circle' : 'cloud-upload-outline'}
+                    size={16}
+                    color={charityLogoUri || charityForm.logo_url ? colors.success : colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.outlineBtnText,
+                      (charityLogoUri || charityForm.logo_url) && styles.outlineBtnTextSuccess,
+                    ]}
+                  >
+                    {charityLogoUri
+                      ? 'New logo selected'
+                      : charityForm.logo_url
+                        ? 'Replace logo'
+                        : 'Upload Logo'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.fieldHint}>PNG or JPEG. SVG files do not render in the app.</Text>
+            </View>
+
+            <View style={styles.rowBtns}>
+              <TouchableOpacity
+                style={[styles.primaryBtn, styles.halfBtn, savingCharity && styles.btnDisabled]}
+                onPress={() => handleSaveCharity(charity.id)}
+                disabled={savingCharity}
+              >
+                {savingCharity ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.outlineBtn, styles.halfBtn]}
+                onPress={cancelEditingCharity}
+                disabled={savingCharity}
+              >
+                <Text style={styles.outlineBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View key={charity.id} style={styles.card}>
+        <View style={styles.nominationHeaderRow}>
+          <View style={styles.nominationTitleBlock}>
+            <Text style={styles.cardTitle}>{charity.name}</Text>
+            <Text style={styles.cardMeta}>EIN: {charity.ein ?? 'Not set'}</Text>
+          </View>
+          {isNomination && (
+            <View style={styles.nominationCountPill}>
+              <Text style={styles.nominationCountText}>{nominationCount}</Text>
+            </View>
+          )}
+        </View>
+        {isNomination && (
+          <Text style={styles.nominationSubtext}>
+            {nominationCount} user{nominationCount !== 1 ? 's' : ''} nominated this
+          </Text>
+        )}
+        {!complete && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="warning-outline" size={13} color={colors.warning} />
+            <Text style={styles.warningText}>
+              Missing {missing.join(', ')} — tap Edit Details to fill in
+            </Text>
+          </View>
+        )}
+        <View style={styles.internalDivider} />
+        <TouchableOpacity
+          style={styles.outlineBtn}
+          onPress={() => startEditingCharity(charity)}
+          disabled={nominationActionLoading !== null}
+        >
+          <View style={styles.btnInner}>
+            <Ionicons name="create-outline" size={14} color={colors.primary} />
+            <Text style={styles.outlineBtnText}>Edit Details</Text>
+          </View>
+        </TouchableOpacity>
+        {isNomination && (
+          <View style={styles.rowBtns}>
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                styles.halfBtn,
+                (!complete || nominationActionLoading !== null) && styles.btnDisabled,
+              ]}
+              onPress={() => handleApproveNomination(charity.id, charity.name)}
+              disabled={!complete || nominationActionLoading !== null}
+            >
+              {isApprovingThis ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <View style={styles.btnInner}>
+                  <Ionicons name="checkmark-outline" size={14} color={colors.white} />
+                  <Text style={styles.primaryBtnText}>Approve</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dangerBtn,
+                styles.halfBtn,
+                nominationActionLoading !== null && styles.btnDisabled,
+              ]}
+              onPress={() => handleRejectNomination(charity.id, charity.name)}
+              disabled={nominationActionLoading !== null}
+            >
+              {isRejectingThis ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <View style={styles.btnInner}>
+                  <Ionicons name="close-outline" size={14} color={colors.white} />
+                  <Text style={styles.dangerBtnText}>Reject</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+        {!isNomination && complete && (
+          <TouchableOpacity
+            style={[styles.primaryBtn, nominationActionLoading !== null && styles.btnDisabled]}
+            onPress={() => handleApproveNomination(charity.id, charity.name)}
+            disabled={nominationActionLoading !== null}
+          >
+            {isApprovingThis ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <View style={styles.btnInner}>
+                <Ionicons name="checkmark-outline" size={14} color={colors.white} />
+                <Text style={styles.primaryBtnText}>Approve</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   const handleRecordDonation = async () => {
     if (!selectedPeriodId) { Alert.alert('Error', 'Please select a voting period.'); return; }
     if (!donationAmount || isNaN(parseFloat(donationAmount))) { Alert.alert('Error', 'Please enter a valid donation amount.'); return; }
@@ -342,11 +660,17 @@ export default function AdminScreen() {
     ]);
   };
 
+  // Deliberately a direct client write rather than an edge function. This list only
+  // holds approved charities (loadCharities filters is_approved = true), so the flip
+  // can only ever go approved -> unapproved, which just removes a charity from the
+  // pool. Getting back in is not a bypass: an unapproved charity now appears under
+  // Incomplete Charities, whose Approve button calls approve-charity and enforces
+  // the six-field gate.
   const handleToggleApproval = async (charityId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase.from('charities').update({ is_approved: !currentStatus }).eq('id', charityId);
       if (error) throw error;
-      await loadCharities();
+      await Promise.all([loadCharities(), loadUnapprovedCharities()]);
     } catch (err) {
       Alert.alert('Error', 'Failed to update charity status.');
     }
@@ -370,7 +694,7 @@ export default function AdminScreen() {
             if (error) throw error;
             Alert.alert('Import Complete', `${data.inserted} ${data.inserted === 1 ? 'charity' : 'charities'} imported and pending approval.`);
             setImportQuery(''); setImportState(''); setImportCity(''); setImportCount('10'); setShowImport(false);
-            await loadPendingNominations();
+            await loadUnapprovedCharities();
           } catch (err) {
             Alert.alert('Error', err.message || 'Import failed.');
           } finally {
@@ -824,75 +1148,27 @@ export default function AdminScreen() {
               </View>
             </View>
           ) : (
-            pendingNominations.map((charity: any) => {
-              const complete = isCharityComplete(charity);
-              const nominationCount = charity.nominations?.filter((n: any) => n.status === 'pending').length ?? 0;
-              const isApprovingThis = nominationActionLoading === charity.id + '_approve';
-              const isRejectingThis = nominationActionLoading === charity.id + '_reject';
-              return (
-                <View key={charity.id} style={styles.card}>
-                  <View style={styles.nominationHeaderRow}>
-                    <View style={styles.nominationTitleBlock}>
-                      <Text style={styles.cardTitle}>{charity.name}</Text>
-                      <Text style={styles.cardMeta}>EIN: {charity.ein ?? 'Not set'}</Text>
-                    </View>
-                    <View style={styles.nominationCountPill}>
-                      <Text style={styles.nominationCountText}>{nominationCount}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.nominationSubtext}>
-                    {nominationCount} user{nominationCount !== 1 ? 's' : ''} nominated this
-                  </Text>
-                  {!complete && (
-                    <View style={styles.warningBanner}>
-                      <Ionicons name="warning-outline" size={13} color={colors.warning} />
-                      <Text style={styles.warningText}>
-                        Fill in all fields via Supabase dashboard to enable approval
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.internalDivider} />
-                  <View style={styles.rowBtns}>
-                    <TouchableOpacity
-                      style={[
-                        styles.primaryBtn,
-                        styles.halfBtn,
-                        (!complete || nominationActionLoading !== null) && styles.btnDisabled,
-                      ]}
-                      onPress={() => handleApproveNomination(charity.id, charity.name)}
-                      disabled={!complete || nominationActionLoading !== null}
-                    >
-                      {isApprovingThis ? (
-                        <ActivityIndicator size="small" color={colors.white} />
-                      ) : (
-                        <View style={styles.btnInner}>
-                          <Ionicons name="checkmark-outline" size={14} color={colors.white} />
-                          <Text style={styles.primaryBtnText}>Approve</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.dangerBtn,
-                        styles.halfBtn,
-                        nominationActionLoading !== null && styles.btnDisabled,
-                      ]}
-                      onPress={() => handleRejectNomination(charity.id, charity.name)}
-                      disabled={nominationActionLoading !== null}
-                    >
-                      {isRejectingThis ? (
-                        <ActivityIndicator size="small" color={colors.white} />
-                      ) : (
-                        <View style={styles.btnInner}>
-                          <Ionicons name="close-outline" size={14} color={colors.white} />
-                          <Text style={styles.dangerBtnText}>Reject</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })
+            pendingNominations.map((charity: any) => renderCharityCard(charity, true))
+          )}
+        </View>
+
+        {/* Incomplete Charities — unapproved rows nobody nominated (bulk imports,
+            or charities whose nominations were all rejected). These previously
+            appeared in no admin list, so they could not be finished or removed. */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <Ionicons name="construct-outline" size={13} color={colors.primaryLight} />
+            <Text style={styles.sectionLabel}>INCOMPLETE CHARITIES</Text>
+          </View>
+          {incompleteCharities.length === 0 ? (
+            <View style={styles.card}>
+              <View style={styles.emptyRow}>
+                <Ionicons name="checkmark-done-circle-outline" size={18} color={colors.primaryLight} />
+                <Text style={styles.emptyText}>No unapproved charities without nominations</Text>
+              </View>
+            </View>
+          ) : (
+            incompleteCharities.map((charity: any) => renderCharityCard(charity, false))
           )}
         </View>
 
@@ -911,7 +1187,7 @@ export default function AdminScreen() {
             <View style={[styles.card, { marginBottom: spacing.sm }]}>
               <Text style={styles.cardTitle}>Import from CharityAPI</Text>
               <Text style={styles.cardMeta}>
-                Imports name and EIN only — fill in remaining fields via Supabase dashboard before approving.
+                Imports name and EIN only. Finish the rest under Incomplete Charities before approving.
               </Text>
               <View style={styles.internalDivider} />
 
@@ -1388,6 +1664,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Fredoka_400Regular',
     borderWidth: 1,
     borderColor: 'rgba(191, 163, 128, 0.4)',
+  },
+  textArea: {
+    minHeight: 96,
+    textAlignVertical: 'top',
+  },
+  fieldHint: {
+    marginTop: spacing.xs,
+    color: colors.primaryLight,
+    fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
   },
 
   // donation history rows

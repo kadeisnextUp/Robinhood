@@ -46,6 +46,12 @@ verify_jwt = true
 import_map = "./functions/record-donation/deno.json"
 entrypoint = "./functions/record-donation/index.ts"
 
+[functions.update-charity]
+enabled = true
+verify_jwt = true
+import_map = "./functions/update-charity/deno.json"
+entrypoint = "./functions/update-charity/index.ts"
+
 [functions.close-voting-period]
 enabled = true
 verify_jwt = true
