@@ -1,3 +1,4 @@
+import CharityLogo from '@/src/components/CharityLogo';
 import RetryState from '@/src/components/RetryState';
 import { borderRadius, colors, spacing, typography } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,61 +54,6 @@ const STATUS_COLORS = {
   rejected: colors.error,
   pending: colors.grey,
 };
-
-const CHARITY_TILE_COLORS = [
-  '#C0714A', '#5B8A6B', '#4A7A8A', '#8A6B40',
-  '#6B4A8A', '#4A8A6B', '#8A4A5B', '#5B7A4A',
-];
-
-const getCharityColor = (name: string): string => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return CHARITY_TILE_COLORS[Math.abs(hash) % CHARITY_TILE_COLORS.length];
-};
-
-function CharityLogo({ logoUrl, name }: { logoUrl: string | null; name: string }) {
-  const [imgError, setImgError] = useState(false);
-  const bg = getCharityColor(name);
-  const initial = name.trim().charAt(0).toUpperCase();
-
-  return (
-    <View style={[charityLogoStyles.tile, { backgroundColor: bg }]}>
-      {logoUrl && !imgError ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={charityLogoStyles.img}
-          resizeMode="contain"
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <Text style={charityLogoStyles.initial}>{initial}</Text>
-      )}
-    </View>
-  );
-}
-
-const charityLogoStyles = StyleSheet.create({
-  tile: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    padding: 6,
-  },
-  img: {
-    width: '100%',
-    height: '100%',
-  },
-  initial: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: 'Fredoka_700Bold',
-  },
-});
 
 export default function ProfileScreen() {
   const posthog = usePostHog();
