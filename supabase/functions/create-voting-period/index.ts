@@ -9,6 +9,48 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Authorisation. config.toml sets verify_jwt = true, but that alone is not a
+    // real gate: the anon key is itself a valid JWT and it ships inside every copy
+    // of the app, so the gateway would accept any caller. Opening a voting period
+    // is an admin action, so check it here.
+    //
+    // Two accepted callers:
+    //   1. a signed-in user whose profile has is_admin
+    //   2. a server-side caller presenting the service role key (scheduled jobs)
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const isServiceRole = bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!isServiceRole) {
+      if (!bearer) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(bearer);
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.is_admin) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Forbidden' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     // guard: don't create a new period if one is already open
     const { data: existingPeriod } = await supabase
       .from('voting_periods')

@@ -21,6 +21,51 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Authorisation. config.toml sets verify_jwt = true, but that alone is not a
+    // real gate: the anon key is itself a valid JWT and it ships inside every copy
+    // of the app. Without this check anyone could force-close a live period,
+    // declare a winner and back-fill donations to it.
+    //
+    // Two accepted callers:
+    //   1. a signed-in user whose profile has is_admin
+    //   2. a server-side caller presenting the service role key (the schedule)
+    //
+    // NOTE: the scheduled job must present the service role key. If it uses some
+    // other credential it will start receiving 401s and weekly rollover will stop.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const isServiceRole = bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!isServiceRole) {
+      if (!bearer) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser(bearer);
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.is_admin) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Forbidden' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     let body: any = {};
     try { body = await req.json(); } catch { /* no body is fine for scheduled calls */ }
 
