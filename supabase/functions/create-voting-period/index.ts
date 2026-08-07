@@ -16,13 +16,20 @@ Deno.serve(async (req) => {
     // is an admin action, so check it here.
     //
     // Two accepted callers:
-    //   1. a signed-in user whose profile has is_admin
-    //   2. a server-side caller presenting the service role key (scheduled jobs)
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const isServiceRole = bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    //   1. a scheduled job presenting CRON_SECRET in x-cron-secret
+    //   2. a signed-in user whose profile has is_admin
+    //
+    // Nothing schedules this today (close-voting-period creates the next period
+    // itself), but it accepts the same secret as its sibling so a schedule can be
+    // added without another auth change. Mirrors toggle-feature's x-admin-secret.
+    const cronSecret = req.headers.get('x-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+    const usingCronSecret = !!expectedCronSecret && cronSecret === expectedCronSecret;
 
-    if (!isServiceRole) {
+    if (!usingCronSecret) {
+      const authHeader = req.headers.get('Authorization') ?? '';
+      const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+
       if (!bearer) {
         return new Response(
           JSON.stringify({ success: false, error: 'Unauthorized' }),

@@ -27,16 +27,21 @@ Deno.serve(async (req) => {
     // declare a winner and back-fill donations to it.
     //
     // Two accepted callers:
-    //   1. a signed-in user whose profile has is_admin
-    //   2. a server-side caller presenting the service role key (the schedule)
+    //   1. the pg_cron schedule, presenting CRON_SECRET in x-cron-secret
+    //   2. a signed-in user whose profile has is_admin
     //
-    // NOTE: the scheduled job must present the service role key. If it uses some
-    // other credential it will start receiving 401s and weekly rollover will stop.
-    const authHeader = req.headers.get('Authorization') ?? '';
-    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const isServiceRole = bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // The schedule uses a dedicated secret rather than the service role key so a
+    // leaked cron credential cannot read the whole database, and so this keeps
+    // working across Supabase's legacy-JWT to sb_secret_ key migration.
+    // Mirrors the x-admin-secret pattern in toggle-feature.
+    const cronSecret = req.headers.get('x-cron-secret');
+    const expectedCronSecret = Deno.env.get('CRON_SECRET');
+    const usingCronSecret = !!expectedCronSecret && cronSecret === expectedCronSecret;
 
-    if (!isServiceRole) {
+    if (!usingCronSecret) {
+      const authHeader = req.headers.get('Authorization') ?? '';
+      const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+
       if (!bearer) {
         return new Response(
           JSON.stringify({ success: false, error: 'Unauthorized' }),
