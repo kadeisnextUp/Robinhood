@@ -20,6 +20,35 @@ import {
 } from 'react-native';
 
 
+// Categories render verbatim on the vote card, so they are a fixed set rather than
+// free text. Free text is how "American Indian" ended up on a peace-and-womb-wisdom
+// charity. Keep this in sync with the same list in
+// supabase/functions/update-charity/index.ts, which enforces it server-side.
+const CHARITY_CATEGORIES = [
+  'Animal Welfare',
+  'American Indian',
+  'Arts & Culture',
+  'Children & Youth',
+  'Civil Rights',
+  'Community Development',
+  'Disabilities',
+  'Disaster Relief',
+  'Education',
+  'Elderly',
+  'Environment',
+  'Food Security',
+  'Health & Medical',
+  'Healthcare',
+  'Housing & Homelessness',
+  'Human Rights',
+  'Human Services',
+  'Legal & Public Interest',
+  'Public Safety',
+  'Relief & Development',
+  'Religious',
+  'Veterans & Military',
+];
+
 export default function AdminScreen() {
   const { session } = useAuth();
   const { config, refetch: refetchConfig } = useAppConfig();
@@ -53,6 +82,7 @@ export default function AdminScreen() {
   });
   const [charityLogoUri, setCharityLogoUri] = useState<string | null>(null);
   const [savingCharity, setSavingCharity] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const transactionIdRef = useRef<TextInput>(null);
   const editTransactionIdRef = useRef<TextInput>(null);
@@ -340,6 +370,7 @@ export default function AdminScreen() {
   const startEditingCharity = (charity: any) => {
     setEditingCharityId(charity.id);
     setCharityLogoUri(null);
+    setShowCategoryPicker(false);
     setCharityForm({
       name: charity.name ?? '',
       ein: charity.ein ?? '',
@@ -353,6 +384,7 @@ export default function AdminScreen() {
   const cancelEditingCharity = () => {
     setEditingCharityId(null);
     setCharityLogoUri(null);
+    setShowCategoryPicker(false);
   };
 
   const handleSaveCharity = async (charityId: string) => {
@@ -433,13 +465,45 @@ export default function AdminScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Category</Text>
-              <TextInput
-                style={styles.textInput}
-                value={charityForm.category}
-                onChangeText={(v) => setCharityField('category', v)}
-                placeholder="e.g. Food Security"
-                placeholderTextColor={colors.primaryLight}
-              />
+              <TouchableOpacity
+                style={styles.selectRow}
+                onPress={() => setShowCategoryPicker((prev) => !prev)}
+              >
+                <Text style={charityForm.category ? styles.selectRowText : styles.selectRowPlaceholder}>
+                  {charityForm.category || 'Select a category'}
+                </Text>
+                <Ionicons
+                  name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.primaryLight}
+                />
+              </TouchableOpacity>
+              {/* A stored value outside the list means older free-text data. Say so
+                  rather than silently dropping it — approval needs a real category. */}
+              {charityForm.category !== '' && !CHARITY_CATEGORIES.includes(charityForm.category) && (
+                <Text style={styles.fieldHint}>
+                  &quot;{charityForm.category}&quot; is not a recognised category. Pick one below.
+                </Text>
+              )}
+              {showCategoryPicker && (
+                <View style={styles.chipGrid}>
+                  {CHARITY_CATEGORIES.map((cat) => {
+                    const selected = charityForm.category === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                        onPress={() => {
+                          setCharityField('category', cat);
+                          setShowCategoryPicker(false);
+                        }}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{cat}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -1674,6 +1738,54 @@ const styles = StyleSheet.create({
     color: colors.primaryLight,
     fontSize: typography.sizes.xs,
     fontFamily: 'Fredoka_400Regular',
+  },
+  selectRow: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(191, 163, 128, 0.4)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectRowText: {
+    color: colors.cardBackground,
+    fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
+  },
+  selectRowPlaceholder: {
+    color: colors.primaryLight,
+    fontSize: typography.sizes.body,
+    fontFamily: 'Fredoka_400Regular',
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  chip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(191, 163, 128, 0.4)',
+    backgroundColor: colors.background,
+  },
+  chipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipText: {
+    color: colors.cardBackground,
+    fontSize: typography.sizes.xs,
+    fontFamily: 'Fredoka_400Regular',
+  },
+  chipTextSelected: {
+    color: colors.white,
+    fontFamily: 'Fredoka_700Bold',
   },
 
   // donation history rows

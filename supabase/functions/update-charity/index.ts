@@ -13,7 +13,34 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MAX_NAME = 200;
 const MAX_DESCRIPTION = 500;
-const MAX_CATEGORY = 60;
+
+// Categories render verbatim on the vote card, so they are a fixed set. The admin UI
+// offers these as a picker, but a picker is not enforcement — check it here too.
+// Keep in sync with CHARITY_CATEGORIES in app/admin.tsx.
+const CATEGORIES = [
+  "Animal Welfare",
+  "American Indian",
+  "Arts & Culture",
+  "Children & Youth",
+  "Civil Rights",
+  "Community Development",
+  "Disabilities",
+  "Disaster Relief",
+  "Education",
+  "Elderly",
+  "Environment",
+  "Food Security",
+  "Health & Medical",
+  "Healthcare",
+  "Housing & Homelessness",
+  "Human Rights",
+  "Human Services",
+  "Legal & Public Interest",
+  "Public Safety",
+  "Relief & Development",
+  "Religious",
+  "Veterans & Military",
+];
 
 const json = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), {
@@ -70,8 +97,10 @@ function buildUpdates(body: Record<string, unknown>): { updates: Updates } | { e
 
   if ("category" in body) {
     const category = cleanText(String(body.category ?? ""));
-    if (category.length > MAX_CATEGORY) {
-      return { error: `Category must be ${MAX_CATEGORY} characters or fewer.` };
+    // Empty clears it, which re-blocks approval. That is intentional: it is how an
+    // older free-text value gets forced through the picker on the next edit.
+    if (category && !CATEGORIES.includes(category)) {
+      return { error: `"${category}" is not a valid category.` };
     }
     updates.category = category || null;
   }
