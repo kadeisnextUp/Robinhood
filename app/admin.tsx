@@ -330,10 +330,10 @@ export default function AdminScreen() {
     const blob = await response.blob();
     const filename = `${charityId}-${Date.now()}.jpg`;
     const { data, error } = await supabase.storage
-      .from('charity-logos')
+      .from('charity_logos')
       .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
     if (error) throw new Error(error.message);
-    const { data: { publicUrl } } = supabase.storage.from('charity-logos').getPublicUrl(data.path);
+    const { data: { publicUrl } } = supabase.storage.from('charity_logos').getPublicUrl(data.path);
     return publicUrl;
   };
 
