@@ -169,20 +169,19 @@ export default function AdminScreen() {
         onPress: async () => {
           setActionLoading(true);
           try {
-            const response = await fetch(
-              `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-voting-period`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}` },
-                body: JSON.stringify({}),
-              }
+            // functions.invoke sends the signed-in user's JWT. The previous raw
+            // fetch sent the anon key, which create-voting-period now rejects
+            // because it cannot prove who the caller is.
+            const { data: result, error } = await supabase.functions.invoke(
+              'create-voting-period',
+              { body: {} }
             );
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error);
+            if (error) throw error;
+            if (!result?.success) throw new Error(result?.error ?? 'Failed to create voting period');
             Alert.alert('Success', 'New voting period created!');
             await loadPeriods();
-          } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to create voting period');
+          } catch (err: any) {
+            Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Failed to create voting period');
           } finally {
             setActionLoading(false);
           }
@@ -200,20 +199,19 @@ export default function AdminScreen() {
         onPress: async () => {
           setActionLoading(true);
           try {
-            const response = await fetch(
-              `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/close-voting-period`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}` },
-                body: JSON.stringify({ force: true, period_id: currentPeriod.id }),
-              }
+            // functions.invoke sends the signed-in user's JWT. The previous raw
+            // fetch sent the anon key, which close-voting-period now rejects
+            // because it cannot prove who the caller is.
+            const { data: result, error } = await supabase.functions.invoke(
+              'close-voting-period',
+              { body: { force: true, period_id: currentPeriod.id } }
             );
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error);
+            if (error) throw error;
+            if (!result?.success) throw new Error(result?.error ?? 'Failed to close voting period');
             Alert.alert('Success', 'Voting period closed. Winner declared!');
             await loadPeriods();
-          } catch (err) {
-            Alert.alert('Error', JSON.stringify(err) || 'Something went wrong');
+          } catch (err: any) {
+            Alert.alert('Error', err?.context?.error ?? err?.message ?? 'Something went wrong');
           } finally {
             setActionLoading(false);
           }
