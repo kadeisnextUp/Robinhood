@@ -14,6 +14,104 @@ function isEasternDST(date: Date): boolean {
   return date >= dstStart && date < dstEnd;
 }
 
+type VoteCount = { charity_id: string; votes: number };
+
+// picks between charities tied at the top. Previously a tie resolved to whichever
+// row Postgres returned first, which is arbitrary rather than fair — and real
+// donations follow the winner.
+//
+// tie order:
+//   1. fewest previous wins       
+//   2. longest since last featured 
+//   3. random                      
+//
+// 
+async function breakTie(
+  supabase: any,
+  tied: VoteCount[],
+  currentPeriodId: string
+): Promise<{ winner: VoteCount; reason: string }> {
+  const ids = tied.map((t) => t.charity_id);
+
+  // fewest previous wins
+  const { data: priorWins } = await supabase
+    .from('voting_periods')
+    .select('winner_charity_id')
+    .in('winner_charity_id', ids);
+
+  const winCounts = new Map<string, number>(ids.map((id) => [id, 0]));
+  for (const row of priorWins ?? []) {
+    const id = row.winner_charity_id;
+    winCounts.set(id, (winCounts.get(id) ?? 0) + 1);
+  }
+
+  const fewestWins = Math.min(...ids.map((id) => winCounts.get(id) ?? 0));
+  let pool = ids.filter((id) => (winCounts.get(id) ?? 0) === fewestWins);
+  if (pool.length === 1) {
+    return {
+      winner: tied.find((t) => t.charity_id === pool[0])!,
+      reason: `fewest previous wins (${fewestWins})`,
+    };
+  }
+
+  // 2. longest since last featured, excluding the period being closed.
+  const { data: appearances } = await supabase
+    .from('voting_period_charities')
+    .select('charity_id, voting_period_id')
+    .in('charity_id', pool)
+    .neq('voting_period_id', currentPeriodId);
+
+  const periodIds = [...new Set((appearances ?? []).map((a: any) => a.voting_period_id))];
+  const createdAt = new Map<string, string>();
+  if (periodIds.length > 0) {
+    const { data: periods } = await supabase
+      .from('voting_periods')
+      .select('id, created_at')
+      .in('id', periodIds);
+    for (const p of periods ?? []) createdAt.set(p.id, p.created_at);
+  }
+
+  // null means never featured before, which sorts as the longest wait
+  const lastSeen = new Map<string, string | null>(pool.map((id) => [id, null]));
+  for (const a of (appearances ?? []) as any[]) {
+    const when = createdAt.get(a.voting_period_id);
+    if (!when) continue;
+    // `.in('charity_id', pool)` guarantees membership, so undefined is unreachable;
+    // coalesce anyway so the comparison below is against string | null, not unknown.
+    const prev = lastSeen.get(a.charity_id) ?? null;
+    if (prev === null || when > prev) lastSeen.set(a.charity_id, when);
+  }
+
+  const neverFeatured = pool.filter((id) => lastSeen.get(id) === null);
+  if (neverFeatured.length === 1) {
+    return {
+      winner: tied.find((t) => t.charity_id === neverFeatured[0])!,
+      reason: 'never featured before',
+    };
+  }
+  if (neverFeatured.length === 0) {
+    const oldest = pool.reduce((a, b) => (lastSeen.get(a)! <= lastSeen.get(b)! ? a : b));
+    const oldestWhen = lastSeen.get(oldest)!;
+    const stillTied = pool.filter((id) => lastSeen.get(id) === oldestWhen);
+    if (stillTied.length === 1) {
+      return {
+        winner: tied.find((t) => t.charity_id === stillTied[0])!,
+        reason: 'longest since last featured',
+      };
+    }
+    pool = stillTied;
+  } else {
+    pool = neverFeatured;
+  }
+
+  // 3. random, only when nothing above separates them
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  return {
+    winner: tied.find((t) => t.charity_id === pick)!,
+    reason: `random among ${pool.length} still tied`,
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const supabase = createClient(
@@ -129,9 +227,54 @@ Deno.serve(async (req) => {
         })
       );
 
-      const winner = voteCounts.reduce((best, current) =>
-        current.votes > best.votes ? current : best
-      );
+      const maxVotes = Math.max(...voteCounts.map((v) => v.votes), 0);
+
+      // Nobody voted. The old code still declared a winner here, because reduce with
+      // a strictly-greater comparison keeps the first element — so a charity nobody
+      // chose would take the donation pool. Close the period with no winner instead
+      // and leave user_donations unassigned for an admin to resolve.
+      if (maxVotes === 0) {
+        const { data: noVoteProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, expo_push_token')
+          .not('expo_push_token', 'is', null);
+
+        const noVoteValid = (noVoteProfiles ?? []).filter((p: any) =>
+          p.expo_push_token?.startsWith('ExponentPushToken[')
+        );
+
+        if (noVoteValid.length > 0) {
+          await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              noVoteValid.map((p: any) => ({
+                to: p.expo_push_token,
+                title: 'No votes this week',
+                body: 'No votes were cast, so no charity was selected. Voting opens again soon.',
+                data: { type: 'no_winner', period_id: period.id },
+              }))
+            ),
+          });
+        }
+
+        results.push({ period_id: period.id, winner_charity_id: null, winning_votes: 0 });
+        continue;
+      }
+
+      const tied = voteCounts.filter((v) => v.votes === maxVotes);
+      let winner = tied[0];
+      let tiebreakReason: string | null = null;
+
+      if (tied.length > 1) {
+        const broken = await breakTie(supabase, tied, period.id);
+        winner = broken.winner;
+        tiebreakReason = broken.reason;
+        console.log(
+          `Tie in period ${period.id}: ${tied.length} charities at ${maxVotes} votes. ` +
+          `Winner ${winner.charity_id} by ${broken.reason}.`
+        );
+      }
 
       const { error: updateError } = await supabase
         .from('voting_periods')
@@ -188,6 +331,10 @@ Deno.serve(async (req) => {
         period_id: period.id,
         winner_charity_id: winner.charity_id,
         winning_votes: winner.votes,
+        // surfaced so a tie is visible in the response and the function logs,
+        // rather than being an invisible coin flip over real donations
+        tiebreak: tiebreakReason,
+        tied_count: tied.length,
       });
     }
 
