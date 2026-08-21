@@ -69,6 +69,10 @@ export default function HomeScreen() {
         .select('id')
         .eq('is_closed', false)
         .lte('start_date', new Date().toISOString())
+        // is_closed alone is not enough. A period stays open until something closes
+        // it, so an expired period kept accepting votes while the leaderboard
+        // correctly showed "VOTING ENDED". Check the clock, not just the flag.
+        .gt('end_date', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -120,6 +124,10 @@ export default function HomeScreen() {
         .select('id')
         .eq('is_closed', false)
         .lte('start_date', new Date().toISOString())
+        // is_closed alone is not enough. A period stays open until something closes
+        // it, so an expired period kept accepting votes while the leaderboard
+        // correctly showed "VOTING ENDED". Check the clock, not just the flag.
+        .gt('end_date', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1)
         .single();

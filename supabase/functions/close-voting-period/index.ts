@@ -206,6 +206,9 @@ Deno.serve(async (req) => {
     }
 
     const results = [];
+    // Periods that closed with nobody voting. Their donation pools roll into the
+    // next period rather than being stranded against a period with no winner.
+    const zeroVotePeriodIds: string[] = [];
 
     for (const period of expiredPeriods) {
       const { data: periodCharities, error: charitiesError } = await supabase
@@ -251,13 +254,16 @@ Deno.serve(async (req) => {
               noVoteValid.map((p: any) => ({
                 to: p.expo_push_token,
                 title: 'No votes this week',
-                body: 'No votes were cast, so no charity was selected. Voting opens again soon.',
+                body: 'No votes were cast, so no charity was selected. This week\'s pool carries over to the next vote.',
                 data: { type: 'no_winner', period_id: period.id },
               }))
             ),
           });
         }
 
+        // Donations stay put for now. The next period does not exist yet — it is
+        // created after this loop — so the move happens there, once we have an id.
+        zeroVotePeriodIds.push(period.id);
         results.push({ period_id: period.id, winner_charity_id: null, winning_votes: 0 });
         continue;
       }
@@ -341,6 +347,7 @@ Deno.serve(async (req) => {
     // when running on schedule (not admin force-close), automatically create next week's period.
     // open/close times are pinned to Eastern clock time (DST-aware): open Mon 00:00 ET, close Sun 23:55 ET.
     let nextPeriodId: string | null = null;
+    let skipReason: string | null = null;
     if (!force) {
       const { data: existing } = await supabase
         .from('voting_periods')
@@ -392,6 +399,20 @@ Deno.serve(async (req) => {
         }
 
         const { data: eligible } = await charityQuery;
+
+        // Log the shortfall rather than skipping in silence. Previously this guard
+        // had no else branch, so failing to open the next voting period returned
+        // success: true and said nothing — you found out when users had nothing to
+        // vote on.
+        if (!eligible || eligible.length < 5) {
+          console.log(
+            `WARNING: did not create next voting period. Only ${eligible?.length ?? 0} eligible ` +
+            `charities (need 5). ${excludedIds.length} excluded as used in the last 3 periods.`
+          );
+          skipReason =
+            `only ${eligible?.length ?? 0} eligible charities, need 5 ` +
+            `(${excludedIds.length} excluded as recently used)`;
+        }
 
         if (eligible && eligible.length >= 5) {
           const selected = eligible.sort(() => Math.random() - 0.5).slice(0, 5);
@@ -466,12 +487,51 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Roll donations from zero-vote periods into the new period. A period nobody
+    // voted in has no winner, so its pool would otherwise be stranded:
+    // record-donation's period picker filters on winner_charity_id being non-null,
+    // meaning the money could never be paid out.
+    let donationsRolledOver = 0;
+    let rolloverPending = false;
+    if (zeroVotePeriodIds.length > 0) {
+      if (nextPeriodId) {
+        const { data: moved, error: moveError } = await supabase
+          .from('user_donations')
+          .update({ voting_period_id: nextPeriodId, charity_id: null })
+          .in('voting_period_id', zeroVotePeriodIds)
+          .select('id');
+
+        if (moveError) {
+          console.log('Donation rollover failed:', moveError.message);
+        } else {
+          donationsRolledOver = moved?.length ?? 0;
+          console.log(
+            `Rolled ${donationsRolledOver} donation(s) from ${zeroVotePeriodIds.length} ` +
+            `zero-vote period(s) into ${nextPeriodId}.`
+          );
+        }
+      } else {
+        // No next period was created, so there is nowhere to roll them to. Say so
+        // loudly rather than leaving the money silently stranded.
+        rolloverPending = true;
+        console.log(
+          `WARNING: ${zeroVotePeriodIds.length} zero-vote period(s) closed but no next ` +
+          `period was created, so donations could not roll over. Periods: ${zeroVotePeriodIds.join(', ')}`
+        );
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         periods_closed: results.length,
         results,
         ...(nextPeriodId ? { next_period_id: nextPeriodId } : {}),
+        ...(skipReason ? { next_period_not_created: skipReason } : {}),
+        ...(zeroVotePeriodIds.length > 0
+          ? { zero_vote_periods: zeroVotePeriodIds.length, donations_rolled_over: donationsRolledOver }
+          : {}),
+        ...(rolloverPending ? { warning: 'zero-vote donations not rolled over: no next period was created' } : {}),
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
