@@ -198,22 +198,15 @@ Deno.serve(async (req) => {
       expiredPeriods = data;
     }
 
-    // Deliberately no early return when nothing was closed. This used to bail out
-    // here, which meant the function could only ever create a voting period as a
-    // side effect of closing one. Any break in that chain — a force-close from the
-    // admin panel, a missed cron run, a manual fix — left the app with no open
-    // period and no way to recover without a human. The rollover below is already
-    // guarded on whether an open period exists, so falling through to it is safe
-    // and makes the schedule self-healing.
+    // deliberately no early return when nothing was closed. 
     const closedThisRun = expiredPeriods ?? [];
 
     const results = [];
-    // Periods that closed with nobody voting. Their donation pools roll into the
+    // periods that closed with nobody voting. Their donation pools roll into the
     // next period rather than being stranded against a period with no winner.
     const zeroVotePeriodIds: string[] = [];
 
-    // Empty when nothing expired, so this simply does not run and we fall through
-    // to the rollover.
+  
     for (const period of closedThisRun) {
       const { data: periodCharities, error: charitiesError } = await supabase
         .from('voting_period_charities')
@@ -262,7 +255,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Donations roll over.
+        // donations roll over.
         zeroVotePeriodIds.push(period.id);
         results.push({ period_id: period.id, winner_charity_id: null, winning_votes: 0 });
         continue;
@@ -356,27 +349,51 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existing) {
-        // find next Monday (UTC date) using noon as a stable DST-check anchor
-        // this cron runs on Monday, so daysToMonday must resolve to 0 that day, not wrap to 7
-        const nextMondayNoon = new Date();
-        const dayOfWeek = nextMondayNoon.getUTCDay();
-        const daysToMonday = (8 - dayOfWeek) % 7;
-        nextMondayNoon.setUTCDate(nextMondayNoon.getUTCDate() + daysToMonday);
-        nextMondayNoon.setUTCHours(12, 0, 0, 0);
+        // Two ways to get here, and they need different start dates.
+        //
+        // Normal rollover: a period was just closed, which only happens on the
+        // Monday the cron runs, so "next Monday" resolves to today.
+        //
+        // Recovery: nothing was closed and there is simply no open period, so this
+        // is filling a gap. Using "next Monday" here dates the period up to six days
+        // ahead, and the home screen requires start_date <= now, so the app shows
+        // "can't load charities" until then. That happened on 2026-08-25. Start now
+        // instead, and still end on the normal Sunday boundary so the weekly cadence
+        // is restored rather than shifted.
+        const isRecovery = closedThisRun.length === 0;
+
+        // Monday anchor at noon, used as a stable DST-check point either way.
+        const dayOfWeek = new Date().getUTCDay();
+        const mondayNoon = new Date();
+        if (isRecovery) {
+          // Monday of the current week: Mon=0, Tue=1, ... Sun=6
+          mondayNoon.setUTCDate(mondayNoon.getUTCDate() - ((dayOfWeek + 6) % 7));
+        } else {
+          mondayNoon.setUTCDate(mondayNoon.getUTCDate() + ((8 - dayOfWeek) % 7));
+        }
+        mondayNoon.setUTCHours(12, 0, 0, 0);
 
         // open: Monday 00:00 Eastern — EDT=UTC-4 → 04:00 UTC, EST=UTC-5 → 05:00 UTC
-        const startOffsetHours = isEasternDST(nextMondayNoon) ? 4 : 5;
-        const nextStart = new Date(nextMondayNoon);
+        const startOffsetHours = isEasternDST(mondayNoon) ? 4 : 5;
+        const nextStart = new Date(mondayNoon);
         nextStart.setUTCHours(startOffsetHours, 0, 0, 0);
+        // Recovery mid-week: open immediately rather than backdating to Monday.
+        const openAt = isRecovery ? new Date() : nextStart;
 
         // close: Sunday 23:55 Eastern — check DST for that Sunday at noon
-        const nextSundayNoon = new Date(nextMondayNoon);
+        const nextSundayNoon = new Date(mondayNoon);
         nextSundayNoon.setUTCDate(nextSundayNoon.getUTCDate() + 6);
         const endOffsetHours = isEasternDST(nextSundayNoon) ? 4 : 5;
         // Sunday 23:55 ET = the following Monday at (offset-1):55 UTC
         const nextEnd = new Date(nextSundayNoon);
         nextEnd.setUTCDate(nextEnd.getUTCDate() + 1); // following Monday
         nextEnd.setUTCHours(endOffsetHours - 1, 55, 0, 0);
+
+        // Recovering late on a Sunday would otherwise produce a period that is
+        // already expired. Push it to the following week's boundary.
+        if (nextEnd.getTime() <= openAt.getTime()) {
+          nextEnd.setUTCDate(nextEnd.getUTCDate() + 7);
+        }
 
         const { data: recentPeriods } = await supabase
           .from('voting_periods')
@@ -417,7 +434,7 @@ Deno.serve(async (req) => {
           const { data: newPeriod, error: periodError } = await supabase
             .from('voting_periods')
             .insert({
-              start_date: nextStart.toISOString(),
+              start_date: openAt.toISOString(),
               end_date: nextEnd.toISOString(),
               is_closed: false,
             })
@@ -505,7 +522,7 @@ Deno.serve(async (req) => {
           );
         }
       } else {
-        // No next period was created, so there is nowhere to roll them to.
+        // no next period was created, so there is nowhere to roll them to.
         rolloverPending = true;
         console.log(
           `WARNING: ${zeroVotePeriodIds.length} zero-vote period(s) closed but no next ` +
