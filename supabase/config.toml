@@ -52,6 +52,12 @@ verify_jwt = true
 import_map = "./functions/update-charity/deno.json"
 entrypoint = "./functions/update-charity/index.ts"
 
+[functions.delete-account]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-account/deno.json"
+entrypoint = "./functions/delete-account/index.ts"
+
 [functions.close-voting-period]
 enabled = true
 verify_jwt = true
