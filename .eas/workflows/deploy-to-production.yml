@@ -1,8 +1,17 @@
 name: Deploy to production
 
-on:
-  push:
-    branches: ['main']
+# Deliberately has no `on:` trigger. Run it with `npm run deploy`.
+#
+# This previously triggered on push to 'main', a branch that does not exist in
+# this repo — the default branch is 'master'. So the trigger never fired and the
+# automation it advertised was never real.
+#
+# Pointing it at 'master' was the other option, but this workflow does not just
+# build: when the fingerprint changes it submits to App Store Connect and the
+# Play internal track. Auto-submitting on every merge is not what we want
+# pre-launch, so deploys stay a deliberate act.
+#
+# create-development-builds.yml is triggerless for the same reason.
 
 jobs:
   fingerprint:
