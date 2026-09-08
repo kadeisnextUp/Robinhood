@@ -175,10 +175,14 @@ vote whose charity is not among the displayed five.
 blocked `UPDATE` raises nothing — it matches zero rows and reports success. If
 the period closes between screen load and tap, a change without `.select()`
 would show a success message for a write that never happened. An empty array
-means "Voting for this week has ended", followed by a reload. The insert path
-needs no `.select()`, but maps `42501` to that same message, since the tightened
-INSERT policy makes a just-expired period a reachable failure rather than a
-theoretical one.
+means "Voting for this week has ended", followed by a reload.
+
+The insert path also gets `.select('id, charity_id').single()`, for a different
+reason: after a first vote, `userVote.id` must be populated so the *next* change
+has a row to target. Without it the user would have to reload the screen before
+they could switch. It additionally maps error `42501` to the same closed-voting
+message, since the tightened INSERT policy makes a just-expired period a
+reachable failure rather than a theoretical one.
 
 **Buttons.** `isMyVote` renders `Your Vote ✓`, disabled, `colors.success` fill
 with `colors.secondary` text (~8.9:1 contrast; white on that green is ~2.2:1 and
