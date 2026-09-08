@@ -559,9 +559,12 @@ export default function HomeScreen() {
               disabled={isMyVote || votingFor !== null || !config.voting_enabled}
             >
               <Text style={[styles.voteButtonText, isMyVote && styles.voteButtonCurrentText]}>
-                {isSaving ? 'Saving…' : isMyVote ? 'Your Vote ✓' : !config.voting_enabled ? 'Paused' : 'Vote '}
+                {/* Once a vote is held, the other cards say Switch. Nothing else on
+                    screen says a vote can be moved, and left as "Vote" they look
+                    identical to how they looked before voting — finished, not editable. */}
+                {isSaving ? 'Saving…' : isMyVote ? 'Your Vote ✓' : !config.voting_enabled ? 'Paused' : userVote ? 'Switch ' : 'Vote '}
                 {!isMyVote && !isSaving && config.voting_enabled && (
-                  <Ionicons name="heart" size={16} color={colors.white} />
+                  <Ionicons name={userVote ? 'swap-horizontal' : 'heart'} size={16} color={colors.white} />
                 )}
               </Text>
             </TouchableOpacity>
