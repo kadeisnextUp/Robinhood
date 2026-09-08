@@ -39,11 +39,11 @@ type Charity = {
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
-  const [votingFor, setVotingFor] = useState(null);
-  const [userHasVoted, setUserHasVoted] = useState(false);
+  const [votingFor, setVotingFor] = useState<string | null>(null);
+  const [userVote, setUserVote] = useState<{ id: string; charity_id: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [charities, setCharities] = useState<Charity[]>([]);
-  const [currentPeriodId, setCurrentPeriodId] = useState(null);
+  const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
 
   // search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,12 +55,17 @@ export default function HomeScreen() {
   const posthog = usePostHog();
   const { config } = useAppConfig();
 
+  const votedCharity = charities.find((c) => c.id === userVote?.charity_id) ?? null;
+  const votedCharityName = votedCharity?.name ?? 'another charity';
+
   useEffect(() => {
-    loadCharities();
-    checkVoteStatus();
+    (async () => {
+      const periodId = await loadCharities();
+      if (periodId) await checkVoteStatus(periodId);
+    })();
   }, []);
 
-  async function loadCharities() {
+  async function loadCharities(): Promise<string | null> {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +85,7 @@ export default function HomeScreen() {
       if (periodError || !period) {
         setError('No active voting period. Please check back later.');
         setLoading(false);
-        return;
+        return null;
       }
 
       setCurrentPeriodId(period.id);
@@ -107,43 +112,32 @@ export default function HomeScreen() {
       // the shape, so behaviour here is identical to before.
       const charityList = periodCharities.map((item) => item.charities) as unknown as Charity[];
       setCharities(charityList);
+      return period.id;
     } catch (err) {
       setError(err.message);
+      return null;
     } finally {
       setLoading(false);
     }
   }
 
-  async function checkVoteStatus() {
+  async function checkVoteStatus(periodId: string) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: period } = await supabase
-        .from('voting_periods')
-        .select('id')
-        .eq('is_closed', false)
-        .lte('start_date', new Date().toISOString())
-        // is_closed alone is not enough. A period stays open until something closes
-        // it, so an expired period kept accepting votes while the leaderboard
-        // correctly showed "VOTING ENDED". Check the clock, not just the flag.
-        .gt('end_date', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!period) return;
-
+      // maybeSingle, not single: single() raises PGRST116 whenever the user has
+      // not voted yet, which was caught and logged as noise on every first load.
       const { data: vote } = await supabase
         .from('votes')
-        .select('id')
+        .select('id, charity_id')
         .eq('user_id', user.id)
-        .eq('voting_period_id', period.id)
-        .single();
+        .eq('voting_period_id', periodId)
+        .maybeSingle();
 
-      setUserHasVoted(!!vote);
+      setUserVote(vote ?? null);
     } catch (err) {
-      console.log('Vote status check:', err.message);
+      console.log('Vote status check:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -277,7 +271,7 @@ export default function HomeScreen() {
                   voting_period_id: currentPeriodId,
                 });
                 Alert.alert('Thank you for voting!', `Your vote for ${charityName} has been recorded.`);
-                setUserHasVoted(true);
+                await checkVoteStatus(currentPeriodId!);
               } catch (err) {
                 Alert.alert('Error', 'Failed to cast vote. Please try again.');
                 console.error(err.message);
@@ -432,9 +426,9 @@ export default function HomeScreen() {
 
         {/* weekly Voting Section */}
         <Text style={styles.header}>Charity Spotlight</Text>
-        {userHasVoted && (
+        {userVote && (
           <Text style={styles.userVoteStatus}>
-            You have voted this week. Come back next week to vote again.
+            You voted for {votedCharityName} this week. Come back next week to vote again.
           </Text>
         )}
 
@@ -458,13 +452,13 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.voteButton, (userHasVoted || !config.voting_enabled) && styles.voteButtonDisabled]}
+              style={[styles.voteButton, (!!userVote || !config.voting_enabled) && styles.voteButtonDisabled]}
               onPress={() => handleVote(charity.id, charity.name)}
-              disabled={userHasVoted || votingFor === charity.id || !config.voting_enabled}
+              disabled={!!userVote || votingFor === charity.id || !config.voting_enabled}
             >
               <Text style={styles.voteButtonText}>
-                {votingFor === charity.id ? 'Your vote' : userHasVoted ? 'Voted' : !config.voting_enabled ? 'Paused' : 'Vote '}
-                {!userHasVoted && config.voting_enabled && <Ionicons name="heart" size={16} color={colors.white} />}
+                {votingFor === charity.id ? 'Your vote' : userVote ? 'Voted' : !config.voting_enabled ? 'Paused' : 'Vote '}
+                {!userVote && config.voting_enabled && <Ionicons name="heart" size={16} color={colors.white} />}
               </Text>
             </TouchableOpacity>
           </View>
