@@ -522,11 +522,6 @@ export default function HomeScreen() {
 
         {/* weekly Voting Section */}
         <Text style={styles.header}>Charity Spotlight</Text>
-        {userVote && (
-          <Text style={styles.userVoteStatus}>
-            You voted for {votedCharityName}. Tap another charity to change your vote.
-          </Text>
-        )}
 
         {charities.map((charity) => {
           const isMyVote = userVote?.charity_id === charity.id;
@@ -740,13 +735,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-  },
-  userVoteStatus: {
-    fontSize: typography.sizes.md,
-    fontFamily: 'Fredoka_400Regular',
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
   },
   charityList: {
     flex: 1,
