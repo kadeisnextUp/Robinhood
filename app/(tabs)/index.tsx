@@ -233,12 +233,23 @@ export default function HomeScreen() {
   };
 
   async function handleVotingClosed() {
-    Alert.alert(
-      'Voting Closed',
-      'Voting for this week has ended. Any vote you already cast still counts.'
-    );
+    // Reload before announcing anything. If a rollover already opened a new
+    // period while this screen was stale, loadCharities() here returns its id
+    // and the alert below says so — otherwise we'd tell the user voting ended
+    // and then render a fresh, votable ballot right underneath that message.
     const periodId = await loadCharities();
-    if (periodId) await checkVoteStatus(periodId);
+    if (periodId) {
+      await checkVoteStatus(periodId);
+      Alert.alert(
+        'Voting Closed',
+        'The previous voting period closed. A new one is now open — you can vote again.'
+      );
+    } else {
+      Alert.alert(
+        'Voting Closed',
+        'Voting for this week has ended. Any vote you already cast still counts.'
+      );
+    }
   }
 
   async function submitNewVote(charityId: string, charityName: string) {
@@ -264,6 +275,20 @@ export default function HomeScreen() {
         // 42501 = row-level security violation, i.e. the period closed under us.
         if (error.code === '42501') {
           await handleVotingClosed();
+          return;
+        }
+        // 23505 = unique violation on (user_id, voting_period_id). Reachable
+        // whenever our local userVote is stale rather than actually null — e.g.
+        // the user was signed out when this screen mounted, checkVoteStatus
+        // short-circuited, and they later logged back in without a remount.
+        // The vote already exists in the DB; refresh our state to match it
+        // instead of reporting a generic failure.
+        if (error.code === '23505') {
+          if (currentPeriodId) await checkVoteStatus(currentPeriodId);
+          Alert.alert(
+            'You already voted this week',
+            'Looks like you already had a vote in this period — we\'ve loaded it. Tap another charity to change it.'
+          );
           return;
         }
         throw error;
@@ -309,6 +334,7 @@ export default function HomeScreen() {
       posthog.capture('charity_vote_changed', {
         from_charity_id: previousCharityId,
         to_charity_id: charityId,
+        charity_name: charityName,
         voting_period_id: currentPeriodId,
       });
       Alert.alert('Vote updated', `Your vote now goes to ${charityName}.`);
@@ -531,7 +557,11 @@ export default function HomeScreen() {
                 !config.voting_enabled && styles.voteButtonDisabled,
               ]}
               onPress={() => handleVote(charity.id, charity.name)}
-              disabled={isMyVote || isSaving || !config.voting_enabled}
+              // Any in-flight write disables every card, not just the one being
+              // written. Otherwise a tap on card B while card A's write is still
+              // in flight races it: userVote is still null, so B also runs
+              // submitNewVote and collides with A on the unique constraint.
+              disabled={isMyVote || votingFor !== null || !config.voting_enabled}
             >
               <Text style={[styles.voteButtonText, isMyVote && styles.voteButtonCurrentText]}>
                 {isSaving ? 'Saving…' : isMyVote ? 'Your Vote ✓' : !config.voting_enabled ? 'Paused' : 'Vote '}
