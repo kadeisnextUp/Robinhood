@@ -39,11 +39,11 @@ type Charity = {
 
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
-  const [votingFor, setVotingFor] = useState(null);
-  const [userHasVoted, setUserHasVoted] = useState(false);
+  const [votingFor, setVotingFor] = useState<string | null>(null);
+  const [userVote, setUserVote] = useState<{ id: string; charity_id: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [charities, setCharities] = useState<Charity[]>([]);
-  const [currentPeriodId, setCurrentPeriodId] = useState(null);
+  const [currentPeriodId, setCurrentPeriodId] = useState<string | null>(null);
 
   // search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,12 +55,17 @@ export default function HomeScreen() {
   const posthog = usePostHog();
   const { config } = useAppConfig();
 
+  const votedCharity = charities.find((c) => c.id === userVote?.charity_id) ?? null;
+  const votedCharityName = votedCharity?.name ?? 'another charity';
+
   useEffect(() => {
-    loadCharities();
-    checkVoteStatus();
+    (async () => {
+      const periodId = await loadCharities();
+      if (periodId) await checkVoteStatus(periodId);
+    })();
   }, []);
 
-  async function loadCharities() {
+  async function loadCharities(): Promise<string | null> {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +85,7 @@ export default function HomeScreen() {
       if (periodError || !period) {
         setError('No active voting period. Please check back later.');
         setLoading(false);
-        return;
+        return null;
       }
 
       setCurrentPeriodId(period.id);
@@ -107,43 +112,32 @@ export default function HomeScreen() {
       // the shape, so behaviour here is identical to before.
       const charityList = periodCharities.map((item) => item.charities) as unknown as Charity[];
       setCharities(charityList);
+      return period.id;
     } catch (err) {
       setError(err.message);
+      return null;
     } finally {
       setLoading(false);
     }
   }
 
-  async function checkVoteStatus() {
+  async function checkVoteStatus(periodId: string) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: period } = await supabase
-        .from('voting_periods')
-        .select('id')
-        .eq('is_closed', false)
-        .lte('start_date', new Date().toISOString())
-        // is_closed alone is not enough. A period stays open until something closes
-        // it, so an expired period kept accepting votes while the leaderboard
-        // correctly showed "VOTING ENDED". Check the clock, not just the flag.
-        .gt('end_date', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!period) return;
-
+      // maybeSingle, not single: single() raises PGRST116 whenever the user has
+      // not voted yet, which was caught and logged as noise on every first load.
       const { data: vote } = await supabase
         .from('votes')
-        .select('id')
+        .select('id, charity_id')
         .eq('user_id', user.id)
-        .eq('voting_period_id', period.id)
-        .single();
+        .eq('voting_period_id', periodId)
+        .maybeSingle();
 
-      setUserHasVoted(!!vote);
+      setUserVote(vote ?? null);
     } catch (err) {
-      console.log('Vote status check:', err.message);
+      console.log('Vote status check:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -238,7 +232,121 @@ export default function HomeScreen() {
     });
   };
 
-  const handleVote = async (charityId: string, charityName: string) => {
+  async function handleVotingClosed() {
+    // Reload before announcing anything. If a rollover already opened a new
+    // period while this screen was stale, loadCharities() here returns its id
+    // and the alert below says so — otherwise we'd tell the user voting ended
+    // and then render a fresh, votable ballot right underneath that message.
+    const periodId = await loadCharities();
+    if (periodId) {
+      await checkVoteStatus(periodId);
+      Alert.alert(
+        'Voting Closed',
+        'The previous voting period closed. A new one is now open — you can vote again.'
+      );
+    } else {
+      Alert.alert(
+        'Voting Closed',
+        'Voting for this week has ended. Any vote you already cast still counts.'
+      );
+    }
+  }
+
+  async function submitNewVote(charityId: string, charityName: string) {
+    if (!currentPeriodId) return;
+    setVotingFor(charityId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      // .select() is not for error detection here — it returns the new row's id,
+      // which userVote needs so a subsequent change has a row to target.
+      const { data, error } = await supabase
+        .from('votes')
+        .insert({
+          user_id: user.id,
+          charity_id: charityId,
+          voting_period_id: currentPeriodId,
+        })
+        .select('id, charity_id')
+        .single();
+
+      if (error) {
+        // 42501 = row-level security violation, i.e. the period closed under us.
+        if (error.code === '42501') {
+          await handleVotingClosed();
+          return;
+        }
+        // 23505 = unique violation on (user_id, voting_period_id). Reachable
+        // whenever our local userVote is stale rather than actually null — e.g.
+        // the user was signed out when this screen mounted, checkVoteStatus
+        // short-circuited, and they later logged back in without a remount.
+        // The vote already exists in the DB; refresh our state to match it
+        // instead of reporting a generic failure.
+        if (error.code === '23505') {
+          if (currentPeriodId) await checkVoteStatus(currentPeriodId);
+          Alert.alert(
+            'You already voted this week',
+            'Looks like you already had a vote in this period — we\'ve loaded it. Tap another charity to change it.'
+          );
+          return;
+        }
+        throw error;
+      }
+
+      setUserVote({ id: data.id, charity_id: data.charity_id });
+      posthog.capture('charity_vote_cast', {
+        charity_id: charityId,
+        charity_name: charityName,
+        voting_period_id: currentPeriodId,
+      });
+      Alert.alert('Thank you for voting!', `Your vote for ${charityName} has been recorded.`);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to cast vote. Please try again.');
+      console.error(err instanceof Error ? err.message : err);
+    } finally {
+      setVotingFor(null);
+    }
+  }
+
+  async function submitVoteChange(charityId: string, charityName: string) {
+    if (!userVote) return;
+    const previousCharityId = userVote.charity_id;
+    setVotingFor(charityId);
+    try {
+      const { data, error } = await supabase
+        .from('votes')
+        .update({ charity_id: charityId })
+        .eq('id', userVote.id)
+        .select('id, charity_id');
+
+      if (error) throw error;
+
+      // An RLS-blocked UPDATE is not an error. It matches zero rows and reports
+      // success, so without this check a closed period would show a cheerful
+      // confirmation for a write that never happened.
+      if (!data || data.length === 0) {
+        await handleVotingClosed();
+        return;
+      }
+
+      setUserVote({ id: data[0].id, charity_id: data[0].charity_id });
+      posthog.capture('charity_vote_changed', {
+        from_charity_id: previousCharityId,
+        to_charity_id: charityId,
+        charity_name: charityName,
+        voting_period_id: currentPeriodId,
+      });
+      Alert.alert('Vote updated', `Your vote now goes to ${charityName}.`);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to change your vote. Please try again.');
+      console.error(err instanceof Error ? err.message : err);
+    } finally {
+      setVotingFor(null);
+    }
+  }
+
+  const handleVote = (charityId: string, charityName: string) => {
     if (!config.voting_enabled) {
       Alert.alert('Voting Paused', 'Voting is temporarily paused. Check back soon.');
       return;
@@ -251,40 +359,22 @@ export default function HomeScreen() {
         );
         return;
       }
+      if (userVote?.charity_id === charityId) return;
+
+      const isChange = userVote !== null;
       Alert.alert(
-        'Are you sure?',
-        `You are about to vote for ${charityName}. You can only vote once per week.`,
+        isChange ? 'Change your vote?' : 'Are you sure?',
+        isChange
+          ? `Your vote will move from ${votedCharityName} to ${charityName}. You can change it as often as you like until voting closes.`
+          : `You are about to vote for ${charityName}. You can change your vote until voting closes.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Vote',
-            onPress: async () => {
-              setVotingFor(charityId);
-              try {
-                const { data: { user } } = await supabase.auth.getUser();
-
-                const { error } = await supabase.from('votes').insert({
-                  user_id: user.id,
-                  charity_id: charityId,
-                  voting_period_id: currentPeriodId,
-                });
-
-                if (error) throw error;
-
-                posthog.capture('charity_vote_cast', {
-                  charity_id: charityId,
-                  charity_name: charityName,
-                  voting_period_id: currentPeriodId,
-                });
-                Alert.alert('Thank you for voting!', `Your vote for ${charityName} has been recorded.`);
-                setUserHasVoted(true);
-              } catch (err) {
-                Alert.alert('Error', 'Failed to cast vote. Please try again.');
-                console.error(err.message);
-              } finally {
-                setVotingFor(null);
-              }
-            },
+            text: isChange ? 'Change Vote' : 'Vote',
+            onPress: () =>
+              isChange
+                ? submitVoteChange(charityId, charityName)
+                : submitNewVote(charityId, charityName),
           },
         ]
       );
@@ -432,13 +522,11 @@ export default function HomeScreen() {
 
         {/* weekly Voting Section */}
         <Text style={styles.header}>Charity Spotlight</Text>
-        {userHasVoted && (
-          <Text style={styles.userVoteStatus}>
-            You have voted this week. Come back next week to vote again.
-          </Text>
-        )}
 
-        {charities.map((charity) => (
+        {charities.map((charity) => {
+          const isMyVote = userVote?.charity_id === charity.id;
+          const isSaving = votingFor === charity.id;
+          return (
           <View key={charity.id} style={styles.charityCard}>
             <CharityLogo
               logoUrl={charity.logo_url}
@@ -458,17 +546,31 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.voteButton, (userHasVoted || !config.voting_enabled) && styles.voteButtonDisabled]}
+              style={[
+                styles.voteButton,
+                isMyVote && styles.voteButtonCurrent,
+                !config.voting_enabled && styles.voteButtonDisabled,
+              ]}
               onPress={() => handleVote(charity.id, charity.name)}
-              disabled={userHasVoted || votingFor === charity.id || !config.voting_enabled}
+              // Any in-flight write disables every card, not just the one being
+              // written. Otherwise a tap on card B while card A's write is still
+              // in flight races it: userVote is still null, so B also runs
+              // submitNewVote and collides with A on the unique constraint.
+              disabled={isMyVote || votingFor !== null || !config.voting_enabled}
             >
-              <Text style={styles.voteButtonText}>
-                {votingFor === charity.id ? 'Your vote' : userHasVoted ? 'Voted' : !config.voting_enabled ? 'Paused' : 'Vote '}
-                {!userHasVoted && config.voting_enabled && <Ionicons name="heart" size={16} color={colors.white} />}
+              <Text style={[styles.voteButtonText, isMyVote && styles.voteButtonCurrentText]}>
+                {/* Once a vote is held, the other cards say Switch. Nothing else on
+                    screen says a vote can be moved, and left as "Vote" they look
+                    identical to how they looked before voting — finished, not editable. */}
+                {isSaving ? 'Saving…' : isMyVote ? 'Your Vote ✓' : !config.voting_enabled ? 'Paused' : userVote ? 'Switch ' : 'Vote '}
+                {!isMyVote && !isSaving && config.voting_enabled && (
+                  <Ionicons name={userVote ? 'swap-horizontal' : 'heart'} size={16} color={colors.white} />
+                )}
               </Text>
             </TouchableOpacity>
           </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -637,13 +739,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  userVoteStatus: {
-    fontSize: typography.sizes.md,
-    fontFamily: 'Fredoka_400Regular',
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
   charityList: {
     flex: 1,
     paddingHorizontal: spacing.md,
@@ -712,6 +807,12 @@ const styles = StyleSheet.create({
   voteButtonDisabled: {
     backgroundColor: colors.textLight,
     opacity: 0.5,
+  },
+  voteButtonCurrent: {
+    backgroundColor: colors.success,
+  },
+  voteButtonCurrentText: {
+    color: colors.secondary,
   },
   websiteButton: {
     alignSelf: 'center',
