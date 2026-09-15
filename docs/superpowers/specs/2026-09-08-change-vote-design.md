@@ -253,3 +253,16 @@ Drop the `UPDATE` policy and restore the original INSERT policy
 (`with check (auth.uid() = user_id)`). The client change is inert without them:
 every `UPDATE` silently matches zero rows, which the code already surfaces as
 "Voting for this week has ended".
+
+## Changes after device testing
+
+Two adjustments were made after testing on a physical device, and supersede the
+banner and button copy described above:
+
+- **The banner was removed.** The card holding the vote already shows a green
+  `Your Vote ✓` button, so a sentence naming the same charity said it twice.
+  `votedCharityName` is still used by the change-vote confirmation dialog.
+- **Other cards read `Switch ⇄` while a vote is held**, instead of `Vote ♥`.
+  With the banner gone nothing else on screen said a vote could be moved, and
+  unchanged buttons made the screen look finished rather than editable. A
+  first-time voter still sees `Vote ♥` on every card.
