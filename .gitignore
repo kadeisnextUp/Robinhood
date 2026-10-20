@@ -55,6 +55,7 @@ app-example
 CLAUDE.md
 AGENTS.md
 .claude/
+.superpowers/*
 
 # impeccable
 .impeccable/
