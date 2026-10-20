@@ -16,6 +16,7 @@ The wizard has completed a deep integration of PostHog analytics into the Fund-I
 | `user_signed_up` | User successfully creates a new account | `app/(auth)/signup.tsx` |
 | `user_logged_in` | User successfully logs in (via email or username) | `app/(auth)/login.tsx` |
 | `charity_vote_cast` | User casts a vote for a charity in the active voting period | `app/(tabs)/index.tsx` |
+| `charity_vote_changed` | User changes their existing vote to a different charity in the active voting period | `app/(tabs)/index.tsx` |
 | `charity_search_performed` | User searches for a charity by name or EIN | `app/(tabs)/index.tsx` |
 | `charity_nomination_submitted` | User nominates a charity for admin review | `app/(tabs)/index.tsx` |
 | `donation_initiated` | User starts a PayPal donation flow | `app/(tabs)/donate.tsx` |
