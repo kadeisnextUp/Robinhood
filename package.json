@@ -28,6 +28,7 @@
     "@supabase/supabase-js": "^2.98.0",
     "expo": "^55.0.18",
     "expo-application": "~55.0.14",
+    "expo-build-properties": "~55.0.18",
     "expo-constants": "^55.0.15",
     "expo-dev-client": "^55.0.28",
     "expo-device": "~55.0.16",
@@ -64,6 +65,7 @@
     "@types/react": "~19.2.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
+    "supabase": "^2.109.1",
     "typescript": "~5.9.2"
   }
 }

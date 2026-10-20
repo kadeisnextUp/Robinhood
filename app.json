@@ -64,6 +64,14 @@
           "project": "react-native",
           "organization": "fund-it"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
       ]
     ],
     "experiments": {
