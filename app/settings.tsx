@@ -36,6 +36,7 @@ export default function SettingsScreen() {
   const notifLoadingRef = useRef(false);
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -168,11 +169,28 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = async () => {
-    posthog.capture('account_deleted');
-    posthog.reset();
-    await supabase.auth.signOut();
-    setDeleteModalVisible(false);
-    router.back();
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('delete-account', {
+        body: {},
+      });
+      if (error) throw error;
+      if (!result?.success) throw new Error(result?.error ?? 'Failed to delete account');
+
+      // Only report the deletion once the server has actually done it.
+      posthog.capture('account_deleted');
+      posthog.reset();
+      await supabase.auth.signOut();
+      setDeleteModalVisible(false);
+      router.back();
+    } catch (err: any) {
+      setDeleting(false);
+      Alert.alert(
+        'Could not delete account',
+        err?.message ?? 'Something went wrong. Please try again.'
+      );
+    }
   };
 
   return (
@@ -340,7 +358,7 @@ export default function SettingsScreen() {
         transparent
         animationType="fade"
         visible={deleteModalVisible}
-        onRequestClose={() => setDeleteModalVisible(false)}
+        onRequestClose={() => !deleting && setDeleteModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -349,15 +367,24 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.modalTitle}>Delete Account</Text>
             <Text style={styles.modalMessage}>
-              This will permanently delete your account and all associated data. This action cannot
-              be undone.
+              This permanently deletes your account, profile, votes, and nominations. Past donations
+              are kept as anonymous records for financial reporting, with nothing linking them to
+              you. This cannot be undone.
             </Text>
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancel} onPress={() => setDeleteModalVisible(false)}>
+              <Pressable
+                style={[styles.modalCancel, deleting && styles.modalButtonDisabled]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deleting}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.modalConfirm} onPress={handleDeleteAccount}>
-                <Text style={styles.modalConfirmText}>Delete</Text>
+              <Pressable
+                style={[styles.modalConfirm, deleting && styles.modalButtonDisabled]}
+                onPress={handleDeleteAccount}
+                disabled={deleting}
+              >
+                <Text style={styles.modalConfirmText}>{deleting ? 'Deleting…' : 'Delete'}</Text>
               </Pressable>
             </View>
           </View>
@@ -655,6 +682,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     backgroundColor: colors.error,
     alignItems: 'center',
+  },
+  modalButtonDisabled: {
+    opacity: 0.5,
   },
   comingSoonBanner: {
     flexDirection: 'row',
