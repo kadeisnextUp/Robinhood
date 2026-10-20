@@ -12,7 +12,7 @@
         "image": "latest"
       },
       "ios": {
-        "image": "latest"
+        "image": "sdk-55"
       }
     },
     "development-simulator": {
@@ -28,7 +28,7 @@
         "image": "latest"
       },
       "ios": {
-        "image": "latest"
+        "image": "sdk-55"
       }
     },
     "production": {
@@ -38,7 +38,7 @@
         "image": "latest"
       },
       "ios": {
-        "image": "latest"
+        "image": "sdk-55"
       }
     }
   },
